@@ -2,15 +2,28 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
 
-// OpenRouter client configured for Molmo model
-const openrouter = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY,
-  defaultHeaders: {
-    'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
-    'X-Title': 'TrainerOS Content Analyzer',
-  },
-});
+let openrouter: OpenAI | null = null;
+
+function getOpenRouterClient(): OpenAI {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('OPENROUTER_API_KEY is not configured');
+  }
+
+  if (!openrouter) {
+    openrouter = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey,
+      defaultHeaders: {
+        'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
+        'X-Title': 'TrainerOS Content Analyzer',
+      },
+    });
+  }
+
+  return openrouter;
+}
 
 export interface VideoFeedbackInput {
   fileUrl: string;
@@ -144,7 +157,7 @@ Răspunde DOAR în format JSON strict, fără markdown:
 
     console.log('🤖 Sending video to Molmo 2 8B for analysis...');
 
-    const completion = await openrouter.chat.completions.create({
+    const completion = await getOpenRouterClient().chat.completions.create({
       model: 'allenai/molmo-2-8b',
       messages: [
         {

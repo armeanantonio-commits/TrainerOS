@@ -2,9 +2,23 @@ import OpenAI from 'openai';
 import { createReadStream } from 'fs';
 import { createGeminiText } from '../lib/gemini.js';
 
-const transcriptionClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let transcriptionClient: OpenAI | null = null;
+
+function getTranscriptionClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+
+  if (!transcriptionClient) {
+    transcriptionClient = new OpenAI({
+      apiKey,
+    });
+  }
+
+  return transcriptionClient;
+}
 
 async function generateAnthropicText(prompt: string, temperature: number, maxTokens: number): Promise<string> {
   return createGeminiText(
@@ -2302,7 +2316,7 @@ export async function transcribeAudio(audioFilePath: string): Promise<Transcript
   try {
     console.log(`🎙️ Transcribing audio from: ${audioFilePath}`);
     
-    const transcription = await transcriptionClient.audio.transcriptions.create({
+    const transcription = await getTranscriptionClient().audio.transcriptions.create({
       file: createReadStream(audioFilePath),
       model: 'whisper-1',
       language: 'ro', // Romanian
