@@ -2,13 +2,10 @@ import type { Request, Response } from 'express';
 import * as openaiService from '../services/openai.service.js';
 import * as molmoService from '../services/molmo.service.js';
 import { prisma } from '../lib/prisma.js';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
 import { getPlanLimits } from '../config/planLimits.js';
-
-const execAsync = promisify(exec);
+import { extractAudioFromVideo } from '../lib/ffmpeg.js';
 
 async function checkContentReviewLimit(req: Request, res: Response): Promise<boolean> {
   if (!req.user || req.user.isAdmin) {
@@ -48,27 +45,6 @@ async function checkContentReviewLimit(req: Request, res: Response): Promise<boo
   }
 
   return true;
-}
-
-async function extractAudioFromVideo(videoPath: string): Promise<string> {
-  const audioPath = videoPath.replace(/\.(mp4|mov|avi|webm)$/i, '.mp3');
-  
-  try {
-    // Check if ffmpeg is available
-    try {
-      await execAsync('ffmpeg -version');
-    } catch (err) {
-      throw new Error('FFmpeg not installed. Please install: brew install ffmpeg (macOS) or sudo apt install ffmpeg (Ubuntu)');
-    }
-
-    // Use ffmpeg to extract audio
-    await execAsync(`ffmpeg -i "${videoPath}" -vn -acodec libmp3lame -q:a 2 "${audioPath}" -y`);
-    console.log(`✅ Audio extracted: ${audioPath}`);
-    return audioPath;
-  } catch (error: any) {
-    console.error('❌ Audio extraction failed:', error);
-    throw new Error(`Audio extraction failed: ${error.message}`);
-  }
 }
 
 export async function analyze(req: Request, res: Response): Promise<void> {
@@ -142,7 +118,7 @@ export async function analyze(req: Request, res: Response): Promise<void> {
         res.status(500).json({
           error: 'Transcription failed',
           message: error.message,
-          details: 'Video upload succeeded but audio transcription failed. Check if FFmpeg is installed and the transcription API key is valid.',
+          details: 'Video upload succeeded but audio transcription failed. Check the bundled FFmpeg binary and the transcription API key.',
         });
         return;
       }

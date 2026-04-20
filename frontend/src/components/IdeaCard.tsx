@@ -29,6 +29,19 @@ interface IdeaCardProps {
 export default function IdeaCard({ idea }: IdeaCardProps) {
   const [copied, setCopied] = useState<string | null>(null);
   const format = (idea.format || 'REEL').toLowerCase();
+  const normalizeSceneText = (value?: string) =>
+    (value || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+
+  const normalizedCta = normalizeSceneText(idea.cta);
+  const rawScenes = idea.script || [];
+  const displayScenes =
+    rawScenes.length > 1 &&
+    normalizeSceneText(rawScenes[rawScenes.length - 1]?.text ?? rawScenes[rawScenes.length - 1]?.description) === normalizedCta
+      ? rawScenes.slice(0, -1)
+      : rawScenes;
 
   const handleCopy = async (text: string, type: string) => {
     await copyToClipboard(text);
@@ -76,7 +89,7 @@ export default function IdeaCard({ idea }: IdeaCardProps) {
               Script pe Scene
             </h3>
             <div className="space-y-3">
-              {(idea.script || []).map((scene, idx) => {
+              {displayScenes.map((scene, idx) => {
                 const sceneNumber = scene.scene ?? scene.number ?? idx + 1;
                 const sceneText = scene.text ?? scene.description ?? '';
                 const sceneVisual = scene.visual;

@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
+import { extractFrameFromVideo } from '../lib/ffmpeg.js';
 
 let openrouter: OpenAI | null = null;
 
@@ -62,16 +63,11 @@ export async function analyzeVideoWithMolmo(input: VideoFeedbackInput): Promise<
     let mimeType: string;
 
     if (input.fileType === 'video') {
-      // For video, extract middle frame using ffmpeg
-      // Note: ffmpeg must be installed on the system
       const frameOutputPath = filePath + '_frame.jpg';
       
       try {
-        const { execSync } = await import('child_process');
         // Extract frame at 3 seconds (typical hook position)
-        execSync(`ffmpeg -i "${filePath}" -ss 00:00:03 -vframes 1 -y "${frameOutputPath}" 2>/dev/null`, { 
-          timeout: 10000 
-        });
+        extractFrameFromVideo(filePath, frameOutputPath);
         
         // Read the extracted frame
         const frameBuffer = fs.readFileSync(frameOutputPath);
@@ -82,8 +78,7 @@ export async function analyzeVideoWithMolmo(input: VideoFeedbackInput): Promise<
         fs.unlinkSync(frameOutputPath);
       } catch (ffmpegError) {
         console.warn('⚠️ ffmpeg extraction failed, using fallback:', ffmpegError);
-        // Fallback: return generic analysis without actual video processing
-        throw new Error('Video frame extraction failed. Please ensure ffmpeg is installed.');
+        throw new Error('Video frame extraction failed. Check the bundled FFmpeg binary.');
       }
     } else {
       // Read image file and convert to base64

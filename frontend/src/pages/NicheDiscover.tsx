@@ -65,6 +65,13 @@ interface GeneratedNicheResult {
   positioning: string;
 }
 
+function splitRichTextSections(value: string): string[] {
+  return value
+    .split(/\n\s*\n/)
+    .map((section) => section.trim())
+    .filter(Boolean);
+}
+
 export default function NicheDiscover() {
   const queryClient = useQueryClient();
   const { refreshUser } = useAuth();
@@ -168,6 +175,26 @@ export default function NicheDiscover() {
     painDetails: [],
     lifestyleSpecific: '',
   });
+
+  const idealClientSections = generatedResult
+    ? splitRichTextSections(generatedResult.idealClient)
+    : [];
+  const positioningSections = generatedResult
+    ? splitRichTextSections(generatedResult.positioning)
+    : [];
+  const idealClientLabels = [
+    'Cine este',
+    'Cum arată ziua ei',
+    'Ce o blochează',
+    'Ce își dorește',
+    'De ce nu au mers alte soluții',
+    'Ce o face diferită',
+  ];
+  const positioningLabels = [
+    'Mesaj central',
+    'Cum te diferențiezi',
+    'Promisiunea ta',
+  ];
 
   const extractVariants = (response: any): NicheVariant[] =>
     (Array.isArray(response?.data?.variants) ? response.data.variants : [])
@@ -1264,15 +1291,39 @@ export default function NicheDiscover() {
               </div>
               <div className="rounded-lg border border-dark-200 bg-dark-300 p-5">
                 <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">Nișa</h3>
-                <p className="text-white">{generatedResult.niche}</p>
+                <p className="text-lg font-semibold text-white">{generatedResult.niche}</p>
               </div>
               <div className="rounded-lg border border-dark-200 bg-dark-300 p-5">
                 <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">Client Ideal</h3>
-                <p className="whitespace-pre-line text-white">{generatedResult.idealClient}</p>
+                <div className="space-y-3">
+                  {idealClientSections.map((section, index) => (
+                    <div
+                      key={`${idealClientLabels[index] || 'client'}-${index}`}
+                      className="rounded-lg border border-dark-200 bg-dark-400/70 p-4"
+                    >
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {idealClientLabels[index] || `Punctul ${index + 1}`}
+                      </p>
+                      <p className="whitespace-pre-line text-white">{section}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="rounded-lg border border-dark-200 bg-dark-300 p-5">
                 <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">Poziționare</h3>
-                <p className="whitespace-pre-line text-white">{generatedResult.positioning}</p>
+                <div className="space-y-3">
+                  {positioningSections.map((section, index) => (
+                    <div
+                      key={`${positioningLabels[index] || 'positioning'}-${index}`}
+                      className="rounded-lg border border-dark-200 bg-dark-400/70 p-4"
+                    >
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {positioningLabels[index] || `Punctul ${index + 1}`}
+                      </p>
+                      <p className="whitespace-pre-line text-white">{section}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

@@ -110,6 +110,7 @@ export async function generate(req: Request, res: Response): Promise<void> {
 
     res.json({ ...result, id: idea.id });
   } catch (error: any) {
+    console.error('generateMultiFormat failed:', error);
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: 'Validation error', details: error.errors });
       return;
@@ -252,6 +253,7 @@ export async function generateMultiFormat(req: Request, res: Response): Promise<
       reel: { ...result.reel, id: ideas[0].id },
       carousel: { ...result.carousel, id: ideas[1].id },
       story: { ...result.story, id: ideas[2].id },
+      source: result.source || 'ai',
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {

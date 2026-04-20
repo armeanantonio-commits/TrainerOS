@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
-import { createReadStream } from 'fs';
-import { createGeminiText } from '../lib/gemini.js';
+import { createReadStream, readFileSync } from 'fs';
+import { GEMINI_MODEL, createGeminiPartsText, createGeminiText } from '../lib/gemini.js';
 
 let transcriptionClient: OpenAI | null = null;
 
@@ -20,7 +20,7 @@ function getTranscriptionClient(): OpenAI {
   return transcriptionClient;
 }
 
-async function generateAnthropicText(prompt: string, temperature: number, maxTokens: number): Promise<string> {
+async function generateGeminiText(prompt: string, temperature: number, maxTokens: number): Promise<string> {
   return createGeminiText(
     [{ role: 'user', content: prompt }],
     {
@@ -30,7 +30,7 @@ async function generateAnthropicText(prompt: string, temperature: number, maxTok
   );
 }
 
-const ANTHROPIC_JSON_SYSTEM_PROMPT = `Return only strict valid JSON.
+const GEMINI_JSON_SYSTEM_PROMPT = `Return only strict valid JSON.
 - No markdown
 - No code fences
 - Output must start with { and end with }
@@ -41,18 +41,18 @@ const ANTHROPIC_JSON_SYSTEM_PROMPT = `Return only strict valid JSON.
 - Do not leave trailing commas
 - If a value contains quoted speech, prefer apostrophes instead of double quotes`;
 
-async function generateAnthropicJson(prompt: string, temperature: number, maxTokens: number): Promise<string> {
+async function generateGeminiJson(prompt: string, temperature: number, maxTokens: number): Promise<string> {
   return createGeminiText(
     [{ role: 'user', content: prompt }],
     {
-      system: ANTHROPIC_JSON_SYSTEM_PROMPT,
+      system: GEMINI_JSON_SYSTEM_PROMPT,
       temperature,
       maxTokens,
     }
   );
 }
 
-async function generateAnthropicTextFromMessages(
+async function generateGeminiTextFromMessages(
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
   temperature: number,
   maxTokens: number
@@ -222,7 +222,19 @@ function applyJsonHeuristics(content: string): string {
     });
 }
 
-async function repairModelJsonWithAnthropic(content: string): Promise<string> {
+function previewModelResponse(content: string | null | undefined, limit = 280): string {
+  const normalized = (content || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) {
+    return '[empty response]';
+  }
+
+  return normalized.length > limit ? `${normalized.slice(0, limit)}...` : normalized;
+}
+
+async function repairModelJsonWithGemini(content: string): Promise<string> {
   const prompt = `Primești un JSON invalid generat de un model.
 
 Repară-l astfel încât să fie JSON valid, fără să schimbi structura, cheile sau sensul valorilor.
@@ -234,11 +246,11 @@ Repară-l astfel încât să fie JSON valid, fără să schimbi structura, cheil
 JSON INVALID:
 ${content}`;
 
-  return await generateAnthropicText(prompt, 0, 2800);
+  return await generateGeminiText(prompt, 0, 2800);
 }
 
 async function repairModelJson<T>(content: string): Promise<T> {
-  const repaired = await repairModelJsonWithAnthropic(content);
+  const repaired = await repairModelJsonWithGemini(content);
   const normalized = applyJsonHeuristics(normalizeModelJson(repaired));
   return JSON.parse(normalized) as T;
 }
@@ -280,6 +292,8 @@ export interface NicheQuickICPInput {
   activeStatus?: string[];
   physicalJobIssue?: string[];
   painDetails?: string[];
+  mainReasons?: string[];
+  primaryReason?: string;
   differentiation?: string;
   internalObjections?: string[];
 }
@@ -296,28 +310,319 @@ export interface NicheResult {
   niche: string;
   idealClient: string;
   positioning: string;
+  sources: {
+    niche: 'ai' | 'fallback';
+    idealClient: 'ai' | 'fallback';
+    positioning: 'ai' | 'fallback';
+  };
+}
+
+function joinHumanList(values: string[]): string {
+  if (values.length === 0) {
+    return '';
+  }
+
+  if (values.length === 1) {
+    return values[0];
+  }
+
+  if (values.length === 2) {
+    return `${values[0]} și ${values[1]}`;
+  }
+
+  return `${values.slice(0, -1).join(', ')} și ${values[values.length - 1]}`;
 }
 
 function normalizeTextField(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function normalizeGenderForNiche(gender: string): string {
+  if (gender === 'femei') {
+    return 'femei';
+  }
+
+  if (gender === 'barbati') {
+    return 'bărbați';
+  }
+
+  return 'persoane';
+}
+
+function normalizeAgeForNiche(input: NicheQuickICPInput): string {
+  return [...(input.ageRanges || []), normalizeTextField(input.customAgeRange)]
+    .filter(Boolean)
+    .join(', ');
+}
+
+function buildQuickIcpFallbackNiche(input: NicheQuickICPInput): string {
+  const normalizedGender = normalizeGenderForNiche(input.gender);
+  const normalizedAge = normalizeAgeForNiche(input);
+  const audienceParts: string[] = [];
+
+  if (normalizedGender === 'persoane') {
+    audienceParts.push('persoane');
+  } else if (normalizedAge) {
+    const ageDescriptor =
+      normalizedAge.includes('18') || normalizedAge.includes('25')
+        ? `tinere (${normalizedAge})`
+        : `de ${normalizedAge}`;
+    audienceParts.push(`${normalizedGender} ${ageDescriptor}`);
+  } else {
+    audienceParts.push(normalizedGender);
+  }
+
+  if (input.definingSituations?.includes('Au un job foarte solicitant fizic')) {
+    audienceParts.push('cu joburi fizice solicitante');
+  } else if (input.jobType === 'activ') {
+    audienceParts.push('cu joburi active');
+  } else if (input.jobType === 'sedentar') {
+    audienceParts.push('cu joburi sedentare');
+  }
+
+  if (input.definingSituations?.includes('Lucrează în ture / program neregulat')) {
+    audienceParts.push('și program neregulat');
+  }
+
+  const reasons = [
+    ...(input.primaryReason ? [input.primaryReason] : []),
+    ...((input.mainReasons || []).filter((reason) => reason !== input.primaryReason)),
+  ];
+  const transformedReasons = reasons.slice(0, 2).map((reason) => {
+    if (reason === 'Slăbit') {
+      return 'slăbire';
+    }
+    if (reason === 'Tonifiere / estetic') {
+      return 'tonifiere';
+    }
+    if (reason === 'Energie / stare generală') {
+      return 'mai multă energie';
+    }
+    if (reason === 'Disciplină / consecvență') {
+      return 'mai multă consecvență';
+    }
+    if (reason === 'Dureri / disconfort') {
+      return 'mai puțin disconfort';
+    }
+
+    return reason.toLowerCase();
+  });
+  const outcome =
+    transformedReasons.length > 0
+      ? `care vor ${joinHumanList(transformedReasons)}`
+      : 'care vor rezultate sustenabile';
+
+  return `Antrenament personalizat și flexibil pentru ${audienceParts.join(' ').replace(/\s+/g, ' ').trim()} ${outcome}.`;
+}
+
+function buildQuickIcpContextSummary(input: NicheQuickICPInput): string {
+  const parts: string[] = [];
+  const normalizedGender = normalizeGenderForNiche(input.gender);
+  const normalizedAge = normalizeAgeForNiche(input);
+
+  if (normalizedGender === 'persoane') {
+    parts.push('persoane');
+  } else if (normalizedAge) {
+    parts.push(`${normalizedGender} de ${normalizedAge}`);
+  } else {
+    parts.push(normalizedGender);
+  }
+
+  if (input.jobType === 'activ') {
+    parts.push('cu ritm activ de lucru');
+  } else if (input.jobType === 'sedentar') {
+    parts.push('cu muncă mai mult sedentară');
+  } else if (input.jobType === 'mixt') {
+    parts.push('cu program de lucru mixt');
+  }
+
+  if (input.definingSituations?.includes('Sunt deja activi / merg la sală')) {
+    parts.push('care merg deja la sală');
+  }
+
+  if (input.definingSituations?.includes('Au un job foarte solicitant fizic')) {
+    parts.push('care au și un job solicitant fizic');
+  }
+
+  if (input.definingSituations?.includes('Lucrează în ture / program neregulat')) {
+    parts.push('cu program neregulat');
+  }
+
+  return joinHumanList(parts.filter(Boolean));
+}
+
+function buildQuickIcpNeedSummary(input: NicheQuickICPInput): string {
+  const reasons = [
+    ...(input.primaryReason ? [input.primaryReason] : []),
+    ...((input.mainReasons || []).filter((reason) => reason !== input.primaryReason)),
+  ];
+  const transformedReasons = reasons.slice(0, 2).map((reason) => {
+    if (reason === 'Slăbit') {
+      return 'să slăbească';
+    }
+    if (reason === 'Tonifiere / estetic') {
+      return 'să se tonifieze';
+    }
+    if (reason === 'Energie / stare generală') {
+      return 'să aibă mai multă energie';
+    }
+    if (reason === 'Disciplină / consecvență') {
+      return 'să fie mai consecvente';
+    }
+    if (reason === 'Dureri / disconfort') {
+      return 'să reducă disconfortul';
+    }
+
+    return reason.toLowerCase();
+  });
+
+  if (transformedReasons.length === 0) {
+    return 'au nevoie de structură clară, consecvență și rezultate sustenabile';
+  }
+
+  return `vor ${joinHumanList(transformedReasons)}`;
+}
+
+function buildQuickIcpFallbackIdealClient(input: NicheQuickICPInput, niche: string): string {
+  const audience = buildQuickIcpContextSummary(input);
+  const needSummary = buildQuickIcpNeedSummary(input);
+
+  return [
+    `Lucrezi cu ${audience || `oameni potriviți pentru nișa "${niche}"`}.`,
+    `Au nevoie de un plan clar, realist și ușor de urmat în programul lor, fără recomandări complicate sau greu de susținut.`,
+    `De obicei ${needSummary}, dar se lovesc de lipsa de structură, oboseală sau inconsistență. Reacționează bine la pași practici, explicați simplu, și la un proces care le arată progres vizibil.`,
+  ].join('\n\n');
+}
+
+function buildQuickIcpFallbackPositioning(input: NicheQuickICPInput, niche: string): string {
+  const needSummary = buildQuickIcpNeedSummary(input);
+
+  return [
+    `Tu ești antrenorul care transformă nișa "${niche}" într-un proces clar și aplicabil.`,
+    `Nu vinzi recomandări generale. Oferi structură, adaptare la programul real și un plan care îi ajută să obțină rezultate fără să simtă că fitnessul le complică viața.`,
+    `Mesajul central: pentru oamenii care ${needSummary}, tu faci lucrurile mai simple, mai clare și mai ușor de urmat.`,
+  ].join('\n\n');
+}
+
+function seemsIncompleteNiche(value: string): boolean {
+  const normalized = normalizeTextField(value);
+
+  if (!normalized) {
+    return true;
+  }
+
+  if (!/[.!?]$/.test(normalized)) {
+    return true;
+  }
+
+  return /\b(și|sau|cu|pentru|din|de|la|în|pe|program|joburi?)\.?$/i.test(normalized);
+}
+
+function buildDiscoverAudienceSummary(input: NicheDiscoverInput): string {
+  const audience =
+    input.gender === 'femei'
+      ? 'femei'
+      : input.gender === 'barbati'
+        ? 'bărbați'
+        : 'persoane';
+  const ages = input.ageRanges.length ? input.ageRanges.join(', ') : '';
+  const parts = [ages ? `${audience} ${ages}` : audience];
+
+  if (input.selectedNiche.toLowerCase().includes('program aglomerat')) {
+    parts.push('cu program aglomerat');
+  } else if (input.definingSituations?.includes('Lucrează în ture / program neregulat')) {
+    parts.push('cu program neregulat');
+  }
+
+  if (input.jobType === 'activ') {
+    parts.push('și ritm activ de lucru');
+  } else if (input.jobType === 'sedentar') {
+    parts.push('și muncă mai mult sedentară');
+  }
+
+  return parts.join(' ');
+}
+
+function buildDiscoverGoalSummary(input: NicheDiscoverInput): string {
+  const goal = normalizeTextField(input.primaryGoal) || normalizeTextField(input.primaryOutcome);
+  return normalizeOutcomeForSentence(goal);
+}
+
+function buildDiscoverFallbackNiche(input: NicheDiscoverInput): string {
+  const selected = normalizeTextField(input.selectedNiche);
+  const audience = buildDiscoverAudienceSummary(input);
+  const goal = buildDiscoverGoalSummary(input);
+
+  if (!selected) {
+    return `Fitness sustenabil pentru ${audience} care vor ${goal}.`;
+  }
+
+  if (/pentru/i.test(selected)) {
+    return `${selected} care vor ${goal}.`;
+  }
+
+  return `${selected} pentru ${audience} care vor ${goal}.`;
+}
+
+function buildDiscoverFallbackIdealClient(input: NicheDiscoverInput, niche: string): string {
+  const audience = buildDiscoverAudienceSummary(input);
+  const problem = normalizeProblemForSentence(input.commonProblems[0] || 'lipsa de claritate și consecvență');
+  const block = normalizeTextField(input.clientStatement) || 'simt că nu au timp pentru ele';
+  const goal = buildDiscoverGoalSummary(input);
+  const routine =
+    input.wakeUpTime || input.jobType || input.sittingTime
+      ? `Ziua lor începe ${input.wakeUpTime ? `devreme, în jur de ${input.wakeUpTime}` : 'repede'}, continuă cu ${input.jobType ? `un program ${input.jobType}` : 'un program plin'} și le lasă puțin spațiu pentru ele la finalul zilei.`
+      : 'Au un program care le consumă energia și le face greu să rămână constante.';
+
+  return [
+    `Lucrezi cu ${audience}, potriviți pentru nișa "${niche}". Nu caută extreme, ci un sistem clar care să le ajute să rămână constante și să obțină rezultate reale.`,
+    routine,
+    `Problema principală este ${problem}, dar în spate apare și blocajul ${block}. De multe ori știu ce ar trebui să facă, însă nu reușesc să transforme intenția într-un plan simplu și repetabil.`,
+    `Își doresc ${goal}, mai mult control și senzația că pot avea grijă de ele fără să își dea viața peste cap. Rezonează cu mesajele simple, aplicabile și cu exemple care arată progres posibil în contextul lor real.`,
+  ].join('\n\n');
+}
+
+function buildDiscoverFallbackPositioning(input: NicheDiscoverInput, niche: string): string {
+  const goal = buildDiscoverGoalSummary(input);
+  const block = normalizeTextField(input.clientStatement) || 'nu au timp pentru ele';
+
+  return [
+    `Tu poziționezi nișa "${niche}" ca o soluție clară pentru oamenii care vor ${goal}, dar simt că ${block}.`,
+    `Nu promiți schimbări extreme și nici nu vinzi presiune. Mesajul tău este despre structură, adaptare la viața reală și pași practici care pot fi urmați consecvent.`,
+    `Diferențiatorul tău: faci fitnessul mai ușor de înțeles, mai ușor de aplicat și mai ușor de păstrat pe termen lung.`,
+  ].join('\n\n');
+}
+
 function ensureCompleteNicheResult(
   partial: Partial<NicheResult>,
-  contextHint: string
+  contextHint: string,
+  fallbackNiche = 'Nișă fitness personalizată',
+  fallbackIdealClient?: string,
+  fallbackPositioning?: string
 ): NicheResult {
-  const niche = normalizeTextField(partial.niche) || 'Nișă fitness personalizată';
+  const parsedNiche = normalizeTextField(partial.niche);
+  const parsedIdealClient = normalizeTextField(partial.idealClient);
+  const parsedPositioning = normalizeTextField(partial.positioning);
+
+  const niche = seemsIncompleteNiche(parsedNiche) ? fallbackNiche : parsedNiche;
   const idealClient =
-    normalizeTextField(partial.idealClient) ||
+    parsedIdealClient ||
+    fallbackIdealClient ||
     `Clientul ideal pentru "${niche}" este persoana care se regăsește clar în contextul descris: ${contextHint}. Are nevoie de o soluție aplicabilă, realistă și adaptată stilului ei de viață, nu de sfaturi generale. Caută claritate, progres vizibil și un plan care să poată fi urmat consecvent fără să-i complice și mai mult programul.`;
   const positioning =
-    normalizeTextField(partial.positioning) ||
-    `Ajut persoanele din nișa "${niche}" să obțină rezultate reale printr-o abordare clară, adaptată contextului lor zilnic și nevoilor lor reale. Fokusul nu este pe recomandări generale, ci pe pași practici care pot fi aplicați consecvent și care duc la progres vizibil.`;
+    parsedPositioning ||
+    fallbackPositioning ||
+    `Ajut persoanele din nișa "${niche}" să obțină rezultate reale printr-o abordare clară, adaptată contextului lor zilnic și nevoilor lor reale. Focusul nu este pe recomandări generale, ci pe pași practici care pot fi aplicați consecvent și care duc la progres vizibil.`;
 
   return {
     niche,
     idealClient,
     positioning,
+    sources: {
+      niche: parsedNiche && !seemsIncompleteNiche(parsedNiche) ? 'ai' : 'fallback',
+      idealClient: parsedIdealClient ? 'ai' : 'fallback',
+      positioning: parsedPositioning ? 'ai' : 'fallback',
+    },
   };
 }
 
@@ -343,7 +648,7 @@ FORMAT:
   "positioning": "Mesajul tău de poziționare unic"
 }`;
 
-  const content = await generateAnthropicJson(prompt, 0.7, 500);
+  const content = await generateGeminiJson(prompt, 0.7, 500);
   const parsed = await parseModelJson<Partial<NicheResult>>(content);
   return ensureCompleteNicheResult(parsed, input.quickNiche);
 }
@@ -397,7 +702,7 @@ FORMAT:
   "positioning": "Mesajul tău de poziționare unic"
 }`;
 
-  const content = await generateAnthropicJson(prompt, 0.7, 900);
+  const content = await generateGeminiJson(prompt, 0.7, 900);
   const parsed = await parseModelJson<Partial<NicheResult>>(content);
   const contextHint = [
     `gen ${input.gender}`,
@@ -409,7 +714,14 @@ FORMAT:
   ]
     .filter(Boolean)
     .join('; ');
-  return ensureCompleteNicheResult(parsed, contextHint);
+  const fallbackNiche = buildQuickIcpFallbackNiche(input);
+  return ensureCompleteNicheResult(
+    parsed,
+    contextHint,
+    fallbackNiche,
+    buildQuickIcpFallbackIdealClient(input, fallbackNiche),
+    buildQuickIcpFallbackPositioning(input, fallbackNiche)
+  );
 }
 
 export async function generateNicheWizard(input: NicheFinderWizardInput): Promise<NicheResult> {
@@ -439,7 +751,7 @@ FORMAT:
   "positioning": "Mesajul tău de poziționare unic"
 }`;
 
-  const content = await generateAnthropicJson(prompt, 0.7, 600);
+  const content = await generateGeminiJson(prompt, 0.7, 600);
   const parsed = await parseModelJson<Partial<NicheResult>>(content);
   const contextHint = [
     input.q1,
@@ -491,6 +803,7 @@ export interface MultiFormatIdeaResult {
   reel: DailyIdeaResult;
   carousel: DailyIdeaResult;
   story: DailyIdeaResult;
+  source?: 'ai' | 'tagged-fallback' | 'emergency-fallback';
 }
 
 export interface StructuredIdeaSection {
@@ -523,6 +836,158 @@ const STRUCTURED_IDEA_DEFAULT_IMPROVEMENTS = [
 
 function normalizeTextValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeNumericValue(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+}
+
+function normalizeDailyIdeaScript(value: unknown): Scene[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item, index) => {
+      if (typeof item === 'string') {
+        const text = item.trim();
+        return text
+          ? {
+              scene: index + 1,
+              text,
+              visual: '',
+            }
+          : null;
+      }
+
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+
+      const source = item as Record<string, unknown>;
+      const text = normalizeTextValue(source.text) || normalizeTextValue(source.description);
+      if (!text) {
+        return null;
+      }
+
+      return {
+        scene: normalizeNumericValue(source.scene ?? source.number, index + 1),
+        text,
+        visual: normalizeTextValue(source.visual),
+      };
+    })
+    .filter((scene): scene is Scene => scene !== null);
+}
+
+function buildDailyIdeaDefaultKeyword(expectedFormat: DailyIdeaResult['format']): string {
+  if (expectedFormat === 'CAROUSEL') {
+    return 'ECHILIBRU';
+  }
+
+  if (expectedFormat === 'STORY') {
+    return 'START';
+  }
+
+  return 'ENERGIE';
+}
+
+function buildDailyIdeaDefaultLeadMagnet(expectedFormat: DailyIdeaResult['format']): string {
+  if (expectedFormat === 'CAROUSEL') {
+    return 'Checklist simplu cu pași clari pentru mai multă energie și mai puțin disconfort peste zi.';
+  }
+
+  if (expectedFormat === 'STORY') {
+    return 'Mini ghid rapid cu pași ușor de aplicat pentru mai multă energie și mai puțină tensiune în corp.';
+  }
+
+  return 'Mini ghid practic cu pași simpli pentru mai multă energie și mai puțin disconfort.';
+}
+
+function buildDailyIdeaDefaultCta(expectedFormat: DailyIdeaResult['format'], keyword: string): string {
+  if (expectedFormat === 'CAROUSEL') {
+    return `Scrie ${keyword} în DM și îți trimit checklistul simplu de aplicat.`;
+  }
+
+  if (expectedFormat === 'STORY') {
+    return `Scrie ${keyword} în DM și îți trimit varianta scurtă și clară.`;
+  }
+
+  return `Scrie ${keyword} în DM și îți trimit pașii de bază.`;
+}
+
+function buildDailyIdeaDefaultReasoning(expectedFormat: DailyIdeaResult['format']): string {
+  if (expectedFormat === 'CAROUSEL') {
+    return 'Ideea funcționează pentru că organizează clar problema și soluția în pași ușor de urmărit. Publicul înțelege repede unde greșește și ce poate schimba imediat. CTA-ul cere un gest mic și oferă un beneficiu clar.';
+  }
+
+  if (expectedFormat === 'STORY') {
+    return 'Ideea funcționează pentru că mesajul este scurt, clar și ușor de consumat. Problema este recognoscibilă, iar soluția pare realistă pentru cineva cu program încărcat. CTA-ul este simplu și direct.';
+  }
+
+  return 'Ideea funcționează pentru că pornește dintr-o problemă recognoscibilă și oferă pași clari, ușor de aplicat. Structura menține atenția, iar CTA-ul duce natural către următorul pas.';
+}
+
+function normalizeDailyIdeaResult(
+  value: unknown,
+  expectedFormat: DailyIdeaResult['format']
+): DailyIdeaResult {
+  if (!value || typeof value !== 'object') {
+    throw new Error(`AI returned invalid ${expectedFormat} payload.`);
+  }
+
+  const source = value as Record<string, unknown>;
+  const hook = normalizeTextValue(source.hook);
+  const script = normalizeDailyIdeaScript(source.script ?? source.scenes ?? source.slides);
+  const format = normalizeTextValue(source.format).toUpperCase() || expectedFormat;
+  const keyword = normalizeTextValue(source.dmKeyword) || buildDailyIdeaDefaultKeyword(expectedFormat);
+  const cta = normalizeTextValue(source.cta) || buildDailyIdeaDefaultCta(expectedFormat, keyword);
+  const reasoning = normalizeTextValue(source.reasoning) || buildDailyIdeaDefaultReasoning(expectedFormat);
+  const leadMagnet = normalizeTextValue(source.leadMagnet) || buildDailyIdeaDefaultLeadMagnet(expectedFormat);
+
+  if (hook.length === 0 || script.length === 0) {
+    throw new Error(`AI returned incomplete ${expectedFormat} content.`);
+  }
+
+  return {
+    format: (['REEL', 'CAROUSEL', 'STORY'].includes(format) ? format : expectedFormat) as DailyIdeaResult['format'],
+    hook,
+    script,
+    cta,
+    objective: normalizeTextValue(source.objective) || 'Generare lead-uri',
+    conversionRate: normalizeNumericValue(source.conversionRate, 0),
+    leadMagnet,
+    dmKeyword: keyword,
+    reasoning,
+  };
+}
+
+function normalizeMultiFormatIdeaResult(value: unknown): MultiFormatIdeaResult {
+  if (!value || typeof value !== 'object') {
+    throw new Error('AI returned an invalid multi-format payload.');
+  }
+
+  const source = value as Record<string, unknown>;
+
+  return {
+    reel: normalizeDailyIdeaResult(source.reel, 'REEL'),
+    carousel: normalizeDailyIdeaResult(source.carousel, 'CAROUSEL'),
+    story: normalizeDailyIdeaResult(source.story, 'STORY'),
+    source:
+      source.source === 'tagged-fallback' || source.source === 'emergency-fallback'
+        ? source.source
+        : 'ai',
+  };
 }
 
 function normalizeStringArray(value: unknown): string[] {
@@ -841,7 +1306,7 @@ TASK:
 
 Returnează DOAR JSON valid.`;
 
-  const content = await generateAnthropicJson(prompt, 0.35, 3200);
+  const content = await generateGeminiJson(prompt, 0.35, 3200);
   const result = await parseModelJson<StructuredIdeaResult>(content);
   return normalizeStructuredIdeaResult(result, fallbackCtaStyle);
 }
@@ -904,6 +1369,237 @@ function buildStructuredIdeaEmergencyResult(input: {
   };
 }
 
+function buildEmergencyAudienceLabel(niche: string): string {
+  const normalized = normalizeIdeaSeedText(niche);
+
+  const ageMatch = normalized.match(/(\d{1,2})\s*[–-]\s*(\d{1,2})/);
+  if (ageMatch) {
+    return `tineri între ${ageMatch[1]} și ${ageMatch[2]} de ani`;
+  }
+
+  if (/persoane/i.test(normalized)) {
+    return 'persoane active';
+  }
+
+  return 'oameni cu program încărcat';
+}
+
+function buildEmergencyLeadMagnet(audienceLabel: string): string {
+  return `Mini ghid practic pentru ${audienceLabel}, cu pași simpli pentru mai multă energie, mai puțin disconfort și o rutină ușor de ținut.`;
+}
+
+function buildEmergencyHook(angle: string): string {
+  return angle.slice(0, 120).trim();
+}
+
+function buildEmergencyScenes(lines: string[], visualPrefix: string): Scene[] {
+  return lines.map((text, index) => ({
+    scene: index + 1,
+    text,
+    visual: `${visualPrefix} ${index + 1}`,
+  }));
+}
+
+function buildMultiFormatIdeaEmergencyResult(input: DailyIdeaInput): MultiFormatIdeaResult {
+  const audienceLabel = buildEmergencyAudienceLabel(input.niche);
+  const baseLeadMagnet = buildEmergencyLeadMagnet(audienceLabel);
+
+  return {
+    reel: {
+      format: 'REEL',
+      hook: buildEmergencyHook('3 greșeli care îți scad energia fără să-ți dai seama'),
+      script: buildEmergencyScenes(
+        [
+          `Dacă te trezești obosit și simți disconfort încă de dimineață, problema nu e doar lipsa de chef. Pentru mulți ${audienceLabel}, ziua începe deja cu tensiune în corp, stat mult cocoșat și prea puțină mișcare reală.`,
+          `Prima greșeală este să sari direct în ritmul zilei fără două minute de activare. Câteva mișcări simple pentru gât, umeri și șolduri schimbă felul în care pornește corpul și reduc senzația că ești deja blocat înainte să începi.`,
+          `A doua greșeală este să stai mult în aceeași poziție și să confunzi oboseala cu lipsa de motivație. De multe ori, corpul îți cere o pauză scurtă și circulație mai bună, nu încă o oră de stat strâns în aceeași postură.`,
+          `A treia greșeală este să crezi că ai nevoie de un plan complicat. Ai nevoie de o rutină simplă, repetabilă și clară. Dacă vrei varianta mea scurtă, scrie ENERGIE în DM și îți trimit pașii de bază.`,
+        ],
+        'Cadru REEL'
+      ),
+      cta: 'Scrie ENERGIE în DM și îți trimit rutina simplă pentru mai multă energie și mai puțin disconfort.',
+      objective: 'Generare lead-uri',
+      conversionRate: 0,
+      leadMagnet: baseLeadMagnet,
+      dmKeyword: 'ENERGIE',
+      reasoning: `Acest Reel funcționează pentru că pornește dintr-o problemă foarte recognoscibilă pentru ${audienceLabel}: oboseală, rigiditate și disconfort în rutina zilnică. Structura pe greșeli creează claritate și retenție, iar soluțiile sunt suficient de simple încât să pară imediat aplicabile. CTA-ul leagă direct problema de un pas concret, fără să ceară efort mare din partea utilizatorului.`,
+    },
+    carousel: {
+      format: 'CAROUSEL',
+      hook: buildEmergencyHook('Ce să schimbi azi ca să nu mai tragi de tine'),
+      script: buildEmergencyScenes(
+        [
+          `Slide-ul acesta deschide problema clar: dacă ai puțină energie și corpul îți dă semnale de disconfort, nu înseamnă că trebuie să te forțezi mai tare. Pentru mulți ${audienceLabel}, de multe ori lipsește structura de bază, nu voința.`,
+          `Primul lucru pe care merită să-l schimbi este începutul zilei. Un start mai calm, cu puțină mobilitate și o trecere mai bună către efort, îți poate schimba complet nivelul de energie din următoarele ore.`,
+          `Al doilea punct este felul în care îți împarți mișcarea peste zi. Dacă stai mult și apoi încerci să recuperezi totul dintr-odată, corpul intră ușor în tensiune și oboseala se simte și mai tare.`,
+          `Al treilea lucru este să reduci așteptarea că ai nevoie de perfecțiune. Pentru publicul acesta, progresul vine mai repede din pași simpli și constanți decât din perioade scurte în care tragi foarte tare și apoi cazi complet.`,
+        ],
+        'Slide CAROUSEL'
+      ),
+      cta: 'Scrie ECHILIBRU în DM și îți trimit schema simplă cu pașii de bază.',
+      objective: 'Generare lead-uri',
+      conversionRate: 0,
+      leadMagnet: baseLeadMagnet,
+      dmKeyword: 'ECHILIBRU',
+      reasoning: `Carousel-ul funcționează pentru că organizează informația într-o formă ușor de parcurs și de salvat. Publicul vede clar unde greșește și ce poate ajusta fără să simtă că primește o soluție complicată. Hook-ul promite claritate, iar CTA-ul cere un gest mic, cu beneficiu imediat și relevant.`,
+    },
+    story: {
+      format: 'STORY',
+      hook: buildEmergencyHook('Dacă te doare tot și n-ai energie, oprește-te un minut'),
+      script: buildEmergencyScenes(
+        [
+          `Dacă simți că te trezești deja fără energie, nu e ceva ce trebuie ignorat. La mulți ${audienceLabel}, combinația dintre stres, stat mult și lipsa unei rutine simple se simte direct în corp.`,
+          `Nu începe cu planuri mari. Începe cu puțină mobilitate, mai multă atenție la postură și câteva pauze scurte care să te scoată din rigiditate.`,
+          `Când faci asta constant, nu doar că scade disconfortul, dar începi să simți că ai mai mult control peste zi. Asta îți crește și energia, și încrederea că poți rămâne consecvent.`,
+          `Dacă vrei varianta mea scurtă și clară, scrie START în DM și ți-o trimit imediat.`,
+        ],
+        'Cadru STORY'
+      ),
+      cta: 'Scrie START în DM și îți trimit pașii simpli pentru o zi cu mai puțin disconfort.',
+      objective: 'Generare lead-uri',
+      conversionRate: 0,
+      leadMagnet: baseLeadMagnet,
+      dmKeyword: 'START',
+      reasoning: `Story-ul merge bine pentru că mesajul este direct, ușor de consumat și are urgență naturală. Problema este formulată simplu, fără jargon, iar soluția pare realistă pentru cineva cu program încărcat. CTA-ul este scurt și foarte ușor de executat.`,
+    },
+    source: 'emergency-fallback',
+  };
+}
+
+function buildMultiFormatTaggedSceneArray(prefix: string, content: string): Scene[] {
+  return Array.from({ length: 4 }, (_, index) => {
+    const sceneNumber = index + 1;
+    const text = extractTaggedValue(content, `${prefix}Scene${sceneNumber}`);
+    const visual = extractTaggedValue(content, `${prefix}Visual${sceneNumber}`);
+
+    if (!text) {
+      return null;
+    }
+
+    return {
+      scene: sceneNumber,
+      text,
+      visual,
+    };
+  }).filter((scene): scene is Scene => scene !== null);
+}
+
+async function generateMultiFormatIdeaTaggedFallback(
+  input: DailyIdeaInput
+): Promise<MultiFormatIdeaResult> {
+  const objective = input.objective || 'lead-gen';
+  const isGeneralIdea = input.general === true;
+  const recentIdeasSection = buildRecentIdeasSection(input.recentIdeas);
+  const brandVoiceSection = buildBrandVoiceSection(input.contentPreferences);
+  const contentCreationSection = buildContentCreationSection(input.contentPreferences);
+
+  const prompt = `Generează 3 idei de content complete pentru un antrenor fitness din România.
+
+NIȘĂ: "${input.niche}"
+MOD: ${isGeneralIdea ? 'general' : 'specific pe nișă'}
+OBIECTIV: ${objective}
+
+BRAND VOICE:
+${brandVoiceSection}
+
+PREFERINȚE DE CREARE CONTENT:
+${contentCreationSection}
+
+ISTORIC IDEI RECENTE:
+${recentIdeasSection}
+
+REGULI:
+- Totul exclusiv în română naturală.
+- Cele 3 idei trebuie să fie clar diferite între ele.
+- Hook-ul trebuie să fie specific și complet.
+- Fiecare scenă trebuie să fie clară și utilă.
+- CTA-ul trebuie să includă un keyword DM și un beneficiu clar.
+- Fără markdown. Fără JSON. Fără explicații extra.
+- Returnează EXACT tag-urile de mai jos.
+
+FORMAT EXACT:
+<reelHook>...</reelHook>
+<reelScene1>...</reelScene1>
+<reelVisual1>...</reelVisual1>
+<reelScene2>...</reelScene2>
+<reelVisual2>...</reelVisual2>
+<reelScene3>...</reelScene3>
+<reelVisual3>...</reelVisual3>
+<reelScene4>...</reelScene4>
+<reelVisual4>...</reelVisual4>
+<reelCta>...</reelCta>
+<reelLeadMagnet>...</reelLeadMagnet>
+<reelDmKeyword>...</reelDmKeyword>
+<reelReasoning>...</reelReasoning>
+
+<carouselHook>...</carouselHook>
+<carouselScene1>...</carouselScene1>
+<carouselVisual1>...</carouselVisual1>
+<carouselScene2>...</carouselScene2>
+<carouselVisual2>...</carouselVisual2>
+<carouselScene3>...</carouselScene3>
+<carouselVisual3>...</carouselVisual3>
+<carouselScene4>...</carouselScene4>
+<carouselVisual4>...</carouselVisual4>
+<carouselCta>...</carouselCta>
+<carouselLeadMagnet>...</carouselLeadMagnet>
+<carouselDmKeyword>...</carouselDmKeyword>
+<carouselReasoning>...</carouselReasoning>
+
+<storyHook>...</storyHook>
+<storyScene1>...</storyScene1>
+<storyVisual1>...</storyVisual1>
+<storyScene2>...</storyScene2>
+<storyVisual2>...</storyVisual2>
+<storyScene3>...</storyScene3>
+<storyVisual3>...</storyVisual3>
+<storyScene4>...</storyScene4>
+<storyVisual4>...</storyVisual4>
+<storyCta>...</storyCta>
+<storyLeadMagnet>...</storyLeadMagnet>
+<storyDmKeyword>...</storyDmKeyword>
+<storyReasoning>...</storyReasoning>`;
+
+  const content = await generateGeminiText(prompt, 0.35, 3600);
+
+  return normalizeMultiFormatIdeaResult({
+    reel: {
+      format: 'REEL',
+      hook: extractTaggedValue(content, 'reelHook'),
+      script: buildMultiFormatTaggedSceneArray('reel', content),
+      cta: extractTaggedValue(content, 'reelCta'),
+      objective: 'Generare lead-uri',
+      conversionRate: 0,
+      leadMagnet: extractTaggedValue(content, 'reelLeadMagnet'),
+      dmKeyword: extractTaggedValue(content, 'reelDmKeyword'),
+      reasoning: extractTaggedValue(content, 'reelReasoning'),
+    },
+    carousel: {
+      format: 'CAROUSEL',
+      hook: extractTaggedValue(content, 'carouselHook'),
+      script: buildMultiFormatTaggedSceneArray('carousel', content),
+      cta: extractTaggedValue(content, 'carouselCta'),
+      objective: 'Generare lead-uri',
+      conversionRate: 0,
+      leadMagnet: extractTaggedValue(content, 'carouselLeadMagnet'),
+      dmKeyword: extractTaggedValue(content, 'carouselDmKeyword'),
+      reasoning: extractTaggedValue(content, 'carouselReasoning'),
+    },
+    story: {
+      format: 'STORY',
+      hook: extractTaggedValue(content, 'storyHook'),
+      script: buildMultiFormatTaggedSceneArray('story', content),
+      cta: extractTaggedValue(content, 'storyCta'),
+      objective: 'Generare lead-uri',
+      conversionRate: 0,
+      leadMagnet: extractTaggedValue(content, 'storyLeadMagnet'),
+      dmKeyword: extractTaggedValue(content, 'storyDmKeyword'),
+      reasoning: extractTaggedValue(content, 'storyReasoning'),
+    },
+    source: 'tagged-fallback',
+  });
+}
+
 async function generateStructuredIdeaTaggedFallback(
   input: {
     ideaText: string;
@@ -949,7 +1645,7 @@ Structură adăugată
 Ton adaptat la nișă
 </improvements>`;
 
-  const generateTaggedContent = async () => generateAnthropicText(prompt, 0.25, 2200);
+  const generateTaggedContent = async () => generateGeminiText(prompt, 0.25, 2200);
   let content: string;
 
   try {
@@ -2010,9 +2706,10 @@ FORMAT:
   console.log(`🎯 Generating idea for niche: "${input.niche}"`);
   console.log(`👤 ICP: ${icpProfileText.substring(0, 100)}...`);
 
-  const content = await generateAnthropicJson(prompt, 0.8, 3500);
-  console.log(`✅ Anthropic response received (${content.length} chars)`);
-  const result = await parseModelJson<DailyIdeaResult>(content);
+  const content = await generateGeminiJson(prompt, 0.8, 3500);
+  console.log(`✅ Gemini response received (${content.length} chars) [model=${GEMINI_MODEL}]`);
+  const parsed = await parseModelJson<DailyIdeaResult>(content);
+  const result = normalizeDailyIdeaResult(parsed, 'REEL');
   
   console.log(`📝 Generated idea - Format: ${result.format}, Hook: "${result.hook.substring(0, 50)}..."`);
   
@@ -2032,218 +2729,128 @@ export async function generateMultiFormatIdea(input: DailyIdeaInput): Promise<Mu
         ? input.icpProfile
         : JSON.stringify(input.icpProfile);
   
-  const prompt = `Tu ești un expert în content marketing fitness cu focus pe conversii reale.
+  const prompt = `Generezi 3 idei de content pentru un antrenor fitness din România.
 
-TOT OUTPUT-UL TREBUIE SĂ FIE EXCLUSIV ÎN ROMÂNĂ NATURALĂ, CORECTĂ GRAMATICAL ȘI UȘOR DE ÎNȚELES PENTRU OAMENI DIN ROMÂNIA.
-NU traduce din engleză. NU folosi jargon englezesc dacă există variantă clară în română. Scrie ca un antrenor român real, pentru public român.
+Scrie exclusiv în română naturală. Fără romgleză. Fără markdown. Fără explicații în afara JSON-ului.
 
-CONTEXT CLIENT:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 MOD: ${isGeneralIdea ? 'idee generală, fără nișă specifică' : 'idee bazată pe nișă'}
-📍 CONTEXT PRINCIPAL: "${input.niche}"
-👤 CLIENT IDEAL: ${isGeneralIdea ? 'Public larg din România interesat de fitness, slăbire sustenabilă, energie mai bună și obiceiuri sănătoase.' : icpProfileText}
-🎯 OBIECTIV: ${objective === 'lead-gen' ? 'generare lead-uri prin DM' : objective}
+CONTEXT:
+- Mod: ${isGeneralIdea ? 'general' : 'bazat pe nișă'}
+- Nișă: "${input.niche}"
+- Client ideal: ${isGeneralIdea ? 'Public larg din România interesat de fitness, energie mai bună și obiceiuri sănătoase.' : icpProfileText}
+- Obiectiv: ${objective === 'lead-gen' ? 'generare lead-uri prin DM' : objective}
 
-BRAND VOICE (OBLIGATORIU):
+BRAND VOICE:
 ${brandVoiceSection}
 
-PREFERINȚE "CUM VREI SĂ CREEZI CONTENT?" (CONTEXT GLOBAL):
+PREFERINȚE DE CREARE CONTENT:
 ${contentCreationSection}
 
-REGULI DE APLICARE PENTRU PREFERINȚELE DE CREARE CONTENT:
-- Dacă există preferințe de filmare/livrare, adaptează toate cele 3 idei la ele.
-- Când propui scene/visual-uri, prioritizează contextul de filmare selectat.
-- Formatele și stilul de exprimare trebuie să țină cont de ce îi vine natural creatorului.
-- Dacă există "Mix, în funcție de zi", poți combina stilurile, dar păstrează coerența.
-
-REGULI BRAND VOICE (OBLIGATORIU):
-- Toate cele 3 idei trebuie să sune ca același antrenor (același ton și vocabular).
-- Respectă explicit ce NU vrea în content.
-- CTA-urile trebuie să respecte stilul CTA ales.
-- Folosește expresii naturale furnizate (dacă există), fără a forța repetiția.
-- Umorul (dacă apare) respectă nuanța aleasă.
-
-REGULI AVANSATE HOOK + SCRIPT + CTA (OBLIGATORIU):
-${DAILY_IDEA_ADVANCED_RULES}
-
-🔵 REGULA CORECTĂ
-Exercițiile recomandate trebuie să fie corecte tehnic și adaptate specific la ideea generată, potrivite pentru nivelul, contextul și limitările publicului țintă.
-
-ISTORIC IDEI RECENTE (EVITĂ REUTILIZAREA):
+ISTORIC IDEI RECENTE:
 ${recentIdeasSection}
 
-REGULI DE UNICITATE (OBLIGATORIU):
-- Cele 3 idei (REEL/CAROUSEL/STORY) trebuie să fie unice între ele.
-- Fiecare idee trebuie să fie unică și față de istoricul recent.
-- NU reutiliza hook-uri, CTA-uri, cadre narative sau aceeași problemă principală.
-- Evită parafrazări: diferența trebuie să fie de concept, nu doar de wording.
+REGULI:
+- Cele 3 idei trebuie să fie clar diferite între ele.
+- Nu reutiliza hook-uri, CTA-uri sau aceeași problemă principală din istoric.
+- Toate ideile trebuie să fie specifice contextului dat.
+- Hook-urile trebuie să fie complete, clare și naturale.
+- CTA-ul trebuie să includă keyword DM și beneficiu clar.
+- Visual-urile trebuie să fie scurte și filmabile.
+- Evită formulările vagi, academice sau traduse prost.
 
-Generează 3 IDEI COMPLET DIFERITE (TEME DIFERITE, NU DOAR FORMATE DIFERITE):
+STRUCTURĂ:
+- REEL: 4 scene, 30-55 cuvinte per scenă, 1 hook, 1 CTA
+- CAROUSEL: 4 scene/slides, 45-70 cuvinte per scenă, 1 hook, 1 CTA
+- STORY: 4 scene, 20-45 cuvinte per scenă, 1 hook, 1 CTA
 
-**REEL**: Alege UN subiect (ex: greșeala comună, mit demontant, hack rapid)
-**CAROUSEL**: Alege ALT subiect diferit (ex: plan 7 zile, before/after, checklist)
-**STORY**: Alege AL TREILEA subiect diferit (ex: motivație, reminder urgent, quick tip)
-
-🚨 CRITICI: Dacă REEL vorbește despre "greșeli la micul dejun", CAROUSEL trebuie despre ALT SUBIECT complet (ex: "5 exerciții pentru acasă"), NU despre micul dejun!
-
-Formatul fiecăruia:
-
-1. **REEL (30-90 sec, 3-6 scene)** - Subiectul 1
-   - Hook dinamic, vizual puternic (MAX 20 cuvinte)
-   - Script total: 120-220 cuvinte
-   - Structură OBLIGATORIE: HOOK → 3-6 secțiuni tematice → CTA final
-   - FIECARE SECȚIUNE: 25-45 cuvinte
-   - Perfect pentru: viral potential, educație densă și practică
-   
-   🎯 CERINȚE CALITATE SCRIPT REEL:
-   ✅ Fiecare secțiune trebuie să DEZVOLTE logic ideea (nu doar afirmații)
-   ✅ Include explicații concrete: DE CE? CUM? CE ÎNSEAMNĂ PRACTIC?
-   ✅ Cel puțin UN exemplu concret sau situație reală
-   ✅ Progresie logică între secțiuni
-   ✅ Limbaj conversațional, nu academic
-   ✅ FILMABIL IMEDIAT fără pregătire suplimentară
-   
-   ❌ INTERZIS:
-   ❌ Afirmații tip "este important să..." fără explicație
-   ❌ Fraze scurte fără dezvoltare
-   ❌ Idei comprimate în 1-2 propoziții superficiale
-   ❌ Repetarea aceleiași idei în formulări diferite
-   ❌ Limbaj teoretic sau generic
-
-2. **CAROUSEL (8-12 slide-uri)** - Subiectul 2 (DIFERIT!)
-   - Hook intrigant
-   - Fiecare slide = un pas/idee DETALIAT
-   - Perfect pentru: liste, pași, comparații, ghiduri
-   - FIECARE SLIDE: 4-5 propoziții (70-120 cuvinte)
-
-3. **STORY (20-30 sec, 4-6 scene)** - Subiectul 3 (DIFERIT!)
-   - Hook INSTANT
-   - Message concentrat dar COMPLET
-   - Perfect pentru: urgență, reminder rapid, tips
-   - FIECARE SCENĂ: 2-4 propoziții (40-80 cuvinte)
-
-⚠️ IMPORTANT - CERINȚE DETALIERE:
-- Cele 3 idei trebuie să aibă TEME/SUBIECTE DIFERITE între ele
-- Fiecare adaptată la platforma sa (REEL = energic + detaliat, CAROUSEL = foarte detaliat, STORY = scurt dar complet)
-- ${isGeneralIdea ? 'Toate trebuie să fie relevante pentru public fitness general din România, fără să presupună o nișă specifică.' : `Toate 100% specifice nisei: "${input.niche}"`}
-- Toate 100% în română nativă, naturală și clară pentru publicul din România
-- Fără romgleză inutilă, fără traduceri literale, fără expresii confuze sau importate artificial
-
-🔥 REGULI CRITICE PENTRU SCRIPTUL REEL:
-
-📏 LUNGIME TOTALĂ: 120-220 cuvinte (fără hook și CTA)
-⏱️ DURATĂ ESTIMATĂ: 30-90 secunde
-📊 STRUCTURĂ OBLIGATORIE: Hook (max 20 cuv) → 3-6 secțiuni (25-45 cuv fiecare) → CTA contextual
-
-✅ FIECARE SECȚIUNE TREBUIE SĂ:
-- Dezvolte ideea LOGIC (nu doar afirmații goale)
-- Răspundă implicit la: DE CE? CUM? CE ÎNSEAMNĂ CONCRET?
-- Includă explicații complete, nu superficiale
-- Conțină cel puțin UN exemplu concret sau situație reală
-- Fie filmabilă IMEDIAT fără pregătire suplimentară
-- Aibă progresie logică față de secțiunea anterioară
-
-❌ ABSOLUT INTERZIS:
-- Afirmații de tip "este important să..." fără explicație
-- Limbaj academic sau teoretic
-- Fraze scurte fără dezvoltare (doar 1-2 propoziții superficiale)
-- Repetarea aceleiași idei în formulări diferite
-- Generalități fără exemple concrete
-- Scripturi care necesită completări sau explicații suplimentare
-
-🎬 CALITATE > CREATIVITATE VAGĂ
-Scriptul trebuie să pară scris de un antrenor REAL, nu de un AI generic.
-Limbaj conversațional, ritm natural, coerență totală.
-
-📋 CHECKLIST VALIDARE ÎNAINTE DE A RĂSPUNDE:
-□ Script REEL: 120-220 cuvinte total (fără hook/CTA) ✓
-□ Fiecare secțiune: 25-45 cuvinte ✓
-□ Include minimum 1 exemplu concret în script ✓
-□ Progresie logică între toate secțiunile ✓
-□ Filmabil imediat, fără completări necesare ✓
-□ Zero afirmații goale sau limbaj teoretic ✓
-□ Fiecare secțiune răspunde la: DE CE? CUM? CE ÎNSEAMNĂ PRACTIC? ✓
-□ Hook-ul are sens complet și logic în română ✓
-□ Nicio propoziție nu sună ambiguă, ruptă sau tradusă prost ✓
-
-Răspunde DOAR în format JSON strict, fără markdown.
-IMPORTANT:
-- JSON valid obligatoriu
-- Fără ghilimele duble ne-escape-uite în interiorul valorilor text
-- Fără newline-uri literale în valorile string; folosește \\n doar dacă este necesar
-- Dacă ai nevoie de citare în text, folosește apostrof simplu
+Răspunde DOAR în JSON valid.
+- Folosește doar ghilimele duble corect escapate.
+- Nu include newline-uri literale în stringuri.
+- Nu include trailing commas.
 
 FORMAT:
 {
   "reel": {
     "format": "REEL",
-    "hook": "Hook dinamic pentru REEL, foarte natural și specific (ideal 8-14 cuvinte, maxim 16)",
+    "hook": "Hook scurt și specific",
     "script": [
-      {"scene": 1, "text": "SECȚIUNE 1 (25-45 cuvinte): Dezvoltă logic ideea + explică DE CE + include context concret din nișă. NU doar afirmații. Trebuie să răspundă: ce înseamnă practic? Exemplu real sau situație specifică OBLIGATORIU.", "visual": "Visual/cadru descriptiv și specific"},
-      {"scene": 2, "text": "SECȚIUNE 2 (25-45 cuvinte): Continuă progresiv ideea + explică CUM funcționează + detalii tehnice concrete (timpi/cantități/pași). Nu teoretic, ci practic și filmabil imediat.", "visual": "Visual/cadru descriptiv"},
-      {"scene": 3, "text": "SECȚIUNE 3 (25-45 cuvinte): Dezvoltă următoarea idee logic + răspunde la DE CE contează + include tranziție naturală. Limbaj conversațional, nu academic.", "visual": "Visual descriptiv"},
-      {"scene": 4, "text": "SECȚIUNE 4 (25-45 cuvinte, OPȚIONAL): Dacă necesară pentru completitudine - aprofundează soluția + include detalii practice + evită repetări.", "visual": "Visual descriptiv"}
+      {"scene": 1, "text": "Scena 1", "visual": "Vizual 1"},
+      {"scene": 2, "text": "Scena 2", "visual": "Vizual 2"},
+      {"scene": 3, "text": "Scena 3", "visual": "Vizual 3"},
+      {"scene": 4, "text": "Scena 4", "visual": "Vizual 4"}
     ],
-    "cta": "CTA REEL contextual, direct și conversațional + keyword DM + beneficiu simplu și clar",
+    "cta": "CTA cu keyword DM și beneficiu clar",
     "objective": "Generare lead-uri",
-    "conversionRate": 45.5,
-    "leadMagnet": "Lead magnet FOARTE specific și detaliat - descrie EXACT ce primește (ex: 'Ghid PDF de 15 pagini cu 21 de rețete pentru micul dejun + plan de antrenament 3x/săptămână adaptat pentru acasă')",
+    "conversionRate": 45,
+    "leadMagnet": "Lead magnet specific",
     "dmKeyword": "KEYWORD",
-    "reasoning": "De ce funcționează REEL-ul - 4-5 propoziții DETALIATE, în română clară și naturală, cu psihologie, pattern-uri de conversie, și de ce rezonează cu ICP-ul. Explică progresiunea logică a scriptului."
+    "reasoning": "Explicație scurtă de ce funcționează"
   },
   "carousel": {
     "format": "CAROUSEL",
-    "hook": "Hook pentru CAROUSEL, foarte natural și specific (ideal 8-14 cuvinte, maxim 16)",
+    "hook": "Hook scurt și specific",
     "script": [
-      {"scene": 1, "text": "Slide 1 DETALIAT: 4-5 propoziții (70-120 cuvinte) - introducere completă cu context și hook explanation", "visual": "Visual slide descriptiv"},
-      {"scene": 2, "text": "Slide 2 DETALIAT: 4-5 propoziții - pas/idee 1 explicat în detaliu cu exemple", "visual": "Visual slide"},
-      {"scene": 3, "text": "Slide 3 DETALIAT: 4-5 propoziții", "visual": "Visual"},
-      {"scene": 4, "text": "Slide 4 DETALIAT: 4-5 propoziții", "visual": "Visual"},
-      {"scene": 5, "text": "Slide 5 DETALIAT: 4-5 propoziții", "visual": "Visual"},
-      {"scene": 6, "text": "Slide 6 DETALIAT: 4-5 propoziții", "visual": "Visual"},
-      {"scene": 7, "text": "Slide 7 DETALIAT: 4-5 propoziții", "visual": "Visual"},
-      {"scene": 8, "text": "Slide 8 DETALIAT: 4-5 propoziții - concluzie și CTA", "visual": "Visual"}
+      {"scene": 1, "text": "Slide 1", "visual": "Vizual 1"},
+      {"scene": 2, "text": "Slide 2", "visual": "Vizual 2"},
+      {"scene": 3, "text": "Slide 3", "visual": "Vizual 3"},
+      {"scene": 4, "text": "Slide 4", "visual": "Vizual 4"}
     ],
-    "cta": "CTA CAROUSEL direct și clar cu keyword DM + beneficiu simplu și relevant",
+    "cta": "CTA cu keyword DM și beneficiu clar",
     "objective": "Generare lead-uri",
-    "conversionRate": 42.0,
-    "leadMagnet": "Lead magnet FOARTE specific și detaliat cu descriere completă a conținutului",
+    "conversionRate": 42,
+    "leadMagnet": "Lead magnet specific",
     "dmKeyword": "KEYWORD",
-    "reasoning": "De ce funcționează CAROUSEL-ul - 4-5 propoziții DETALIATE, în română clară și naturală"
+    "reasoning": "Explicație scurtă de ce funcționează"
   },
   "story": {
     "format": "STORY",
-    "hook": "Hook urgent pentru STORY, natural și specific (ideal 8-14 cuvinte, maxim 16)",
+    "hook": "Hook scurt și specific",
     "script": [
-      {"scene": 1, "text": "Text COMPLET 2-4 propoziții (40-80 cuvinte) - hook explanation + context", "visual": "Visual descriptiv"},
-      {"scene": 2, "text": "Text COMPLET 2-4 propoziții - problema/soluția explicată", "visual": "Visual"},
-      {"scene": 3, "text": "Text COMPLET 2-4 propoziții", "visual": "Visual"},
-      {"scene": 4, "text": "Text COMPLET 2-4 propoziții - CTA și urgență", "visual": "Visual"}
+      {"scene": 1, "text": "Scena 1", "visual": "Vizual 1"},
+      {"scene": 2, "text": "Scena 2", "visual": "Vizual 2"},
+      {"scene": 3, "text": "Scena 3", "visual": "Vizual 3"},
+      {"scene": 4, "text": "Scena 4", "visual": "Vizual 4"}
     ],
-    "cta": "CTA STORY direct și urgent, cu keyword DM + beneficiu clar și simplu",
+    "cta": "CTA cu keyword DM și beneficiu clar",
     "objective": "Generare lead-uri",
-    "conversionRate": 38.0,
-    "leadMagnet": "Lead magnet relevant și detaliat",
+    "conversionRate": 38,
+    "leadMagnet": "Lead magnet specific",
     "dmKeyword": "KEYWORD",
-    "reasoning": "De ce funcționează STORY-ul - 4-5 propoziții DETALIATE, în română clară și naturală"
+    "reasoning": "Explicație scurtă de ce funcționează"
   }
 }`;
 
   console.log(`🎯 Generating multi-format ideas for niche: "${input.niche}"`);
 
   const parseResponse = async () => {
-    const content = await generateAnthropicJson(prompt, 0.8, 6000);
-    console.log(`✅ Anthropic multi-format response received (${content.length} chars)`);
-    return parseModelJson<MultiFormatIdeaResult>(content);
+    const content = await generateGeminiJson(prompt, 0.8, 6000);
+    console.log(`✅ Gemini multi-format response received (${content.length} chars) [model=${GEMINI_MODEL}]`);
+
+    try {
+      const parsed = await parseModelJson<MultiFormatIdeaResult>(content);
+      return normalizeMultiFormatIdeaResult(parsed);
+    } catch (error) {
+      console.warn(`Gemini multi-format raw preview: ${previewModelResponse(content)}`);
+      throw error;
+    }
   };
 
   let result: MultiFormatIdeaResult;
   try {
     result = await parseResponse();
   } catch (error) {
-    console.warn('Multi-format idea parsing failed on first attempt, retrying generation once:', error);
-    result = await parseResponse();
+    console.warn('Multi-format idea parsing failed on first attempt, switching to tagged fallback:', error);
+
+    try {
+      result = await generateMultiFormatIdeaTaggedFallback(input);
+      console.log(`✅ Gemini multi-format tagged fallback succeeded [model=${GEMINI_MODEL}]`);
+    } catch (fallbackError) {
+      console.warn('Multi-format tagged fallback failed, using emergency local fallback:', fallbackError);
+      result = buildMultiFormatIdeaEmergencyResult(input);
+      console.log('✅ Multi-format emergency local fallback succeeded');
+    }
   }
+
+  result.source = result.source || 'ai';
   
   console.log(`📝 Generated 3 formats - REEL: "${result.reel.hook.substring(0, 30)}..." | CAROUSEL: "${result.carousel.hook.substring(0, 30)}..." | STORY: "${result.story.hook.substring(0, 30)}..."`);
   
@@ -2270,7 +2877,7 @@ export async function structureUserIdea(input: {
   };
 
   const parsePrimaryStructuredIdea = async (): Promise<StructuredIdeaResult> => {
-    const content = await generateAnthropicJson(prompt, 0.45, 3400);
+    const content = await generateGeminiJson(prompt, 0.45, 3400);
     return normalizeStructuredIdeaResult(
       await parseModelJson<StructuredIdeaResult>(content),
       ctaStyle
@@ -2312,26 +2919,81 @@ export interface TranscriptionResult {
   duration?: number;
 }
 
+function getAudioMimeType(audioFilePath: string): string {
+  const normalizedPath = audioFilePath.toLowerCase();
+
+  if (normalizedPath.endsWith('.mp3')) {
+    return 'audio/mpeg';
+  }
+
+  if (normalizedPath.endsWith('.wav')) {
+    return 'audio/wav';
+  }
+
+  if (normalizedPath.endsWith('.m4a')) {
+    return 'audio/mp4';
+  }
+
+  if (normalizedPath.endsWith('.ogg')) {
+    return 'audio/ogg';
+  }
+
+  return 'application/octet-stream';
+}
+
+async function transcribeAudioWithGemini(audioFilePath: string): Promise<TranscriptionResult> {
+  const audioBase64 = readFileSync(audioFilePath).toString('base64');
+  const content = await createGeminiPartsText(
+    [
+      {
+        text:
+          'Transcribe this audio in Romanian. Return only the spoken words, without commentary, labels, timestamps, or formatting cleanup beyond normal punctuation.',
+      },
+      {
+        inline_data: {
+          mime_type: getAudioMimeType(audioFilePath),
+          data: audioBase64,
+        },
+      },
+    ],
+    {
+      temperature: 0,
+      maxTokens: 4096,
+    }
+  );
+
+  return {
+    text: content.trim(),
+    language: 'ro',
+  };
+}
+
 export async function transcribeAudio(audioFilePath: string): Promise<TranscriptionResult> {
   try {
     console.log(`🎙️ Transcribing audio from: ${audioFilePath}`);
-    
-    const transcription = await getTranscriptionClient().audio.transcriptions.create({
-      file: createReadStream(audioFilePath),
-      model: 'whisper-1',
-      language: 'ro', // Romanian
-      response_format: 'verbose_json',
-    });
 
-    console.log(`✅ Transcription complete: ${transcription.text.substring(0, 100)}...`);
-    
-    return {
-      text: transcription.text,
-      language: transcription.language,
-      duration: transcription.duration,
-    };
+    if (process.env.OPENAI_API_KEY) {
+      const transcription = await getTranscriptionClient().audio.transcriptions.create({
+        file: createReadStream(audioFilePath),
+        model: 'whisper-1',
+        language: 'ro',
+        response_format: 'verbose_json',
+      });
+
+      console.log(`✅ OpenAI transcription complete: ${transcription.text.substring(0, 100)}...`);
+
+      return {
+        text: transcription.text,
+        language: transcription.language,
+        duration: transcription.duration,
+      };
+    }
+
+    const transcription = await transcribeAudioWithGemini(audioFilePath);
+    console.log(`✅ Gemini transcription complete: ${transcription.text.substring(0, 100)}...`);
+    return transcription;
   } catch (error: any) {
-    console.error('❌ Whisper transcription failed:', error);
+    console.error('❌ Audio transcription failed:', error);
     throw new Error(`Transcription failed: ${error.message}`);
   }
 }
@@ -2361,6 +3023,89 @@ export interface ContentFeedbackResult {
   suggestions: Suggestion[];
   summary: string;
   transcription?: string; // Return transcription for video
+}
+
+function clampScore(value: unknown): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function normalizeSuggestion(entry: any): Suggestion | null {
+  const type = entry?.type;
+  const category = typeof entry?.category === 'string' ? entry.category.trim() : '';
+  const text = typeof entry?.text === 'string' ? entry.text.trim() : '';
+
+  if (!text) {
+    return null;
+  }
+
+  return {
+    type: type === 'error' || type === 'warning' || type === 'success' ? type : 'warning',
+    category: category || 'general',
+    text,
+  };
+}
+
+function buildFeedbackFallbackSummary(input: ContentFeedbackInput, suggestions: Suggestion[]): string {
+  const context = input.transcription
+    ? 'Analiza s-a bazat pe transcripția audio extrasă din video.'
+    : 'Analiza s-a bazat pe best practices generale pentru acest tip de conținut.';
+  const topSuggestion = suggestions[0]?.text
+    ? `Prima prioritate: ${suggestions[0].text}`
+    : 'Prima prioritate: clarifică mesajul, adaugă dovadă socială și încheie cu un CTA explicit.';
+
+  return `${context} Conținutul are nevoie de îmbunătățiri pe claritate, încredere și conversie. ${topSuggestion}`;
+}
+
+function normalizeContentFeedbackResult(
+  parsed: Partial<ContentFeedbackResult> | null | undefined,
+  input: ContentFeedbackInput
+): ContentFeedbackResult {
+  const suggestions = Array.isArray(parsed?.suggestions)
+    ? parsed.suggestions.map((entry) => normalizeSuggestion(entry)).filter((entry): entry is Suggestion => Boolean(entry))
+    : [];
+
+  const fallbackSuggestions: Suggestion[] = [
+    {
+      type: 'warning',
+      category: 'clarity',
+      text: 'Mesajul principal nu este încă suficient de clar. Spune explicit din prima propoziție cui te adresezi și ce rezultat promiți.',
+    },
+    {
+      type: 'warning',
+      category: 'trust',
+      text: 'Adaugă un element de credibilitate: exemplu personal, rezultat concret sau dovadă socială.',
+    },
+    {
+      type: 'error',
+      category: 'cta',
+      text: 'Încheie cu un CTA specific și acționabil, nu cu o formulare vagă sau implicită.',
+    },
+  ];
+
+  const normalizedSuggestions: Suggestion[] =
+    suggestions.length > 0
+      ? suggestions.slice(0, 5)
+      : fallbackSuggestions;
+
+  const summary =
+    typeof parsed?.summary === 'string' && parsed.summary.trim().length > 0
+      ? parsed.summary.trim()
+      : buildFeedbackFallbackSummary(input, normalizedSuggestions);
+
+  return {
+    clarityScore: clampScore(parsed?.clarityScore),
+    relevanceScore: clampScore(parsed?.relevanceScore),
+    trustScore: clampScore(parsed?.trustScore),
+    ctaScore: clampScore(parsed?.ctaScore),
+    overallScore: clampScore(parsed?.overallScore),
+    suggestions: normalizedSuggestions,
+    summary,
+    transcription: parsed?.transcription,
+  };
 }
 
 export async function analyzeFeedback(input: ContentFeedbackInput): Promise<ContentFeedbackResult> {
@@ -2459,7 +3204,7 @@ Răspunde DOAR în format JSON strict, fără markdown:
   "summary": "Rezumat în 2-3 propoziții: ce funcționează, ce lipsește, și impactul potențial după îmbunătățiri"
 }`;
 
-  console.log(`🤖 Analyzing content with Anthropic${input.transcription ? ' (with Whisper transcription)' : ''}...`);
+  console.log(`🤖 Analyzing content with Gemini${input.transcription ? ' (with Whisper transcription)' : ''}...`);
   
   const messages = input.transcription ? [
     { 
@@ -2472,9 +3217,10 @@ Răspunde DOAR în format JSON strict, fără markdown:
   ];
 
   const content =
-    (await generateAnthropicTextFromMessages(messages, 0.6, 1500)) || '{}';
-  const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-  const result = JSON.parse(cleaned);
+    (await generateGeminiTextFromMessages(messages, 0.6, 1500)) || '{}';
+  console.log(`🧾 Raw content analysis preview: ${previewModelResponse(content, 200)}`);
+  const parsed = await parseModelJson<Partial<ContentFeedbackResult>>(content);
+  const result = normalizeContentFeedbackResult(parsed, input);
   
   // Include transcription in response
   if (input.transcription) {
@@ -2563,7 +3309,7 @@ const PRESET_NICHE_FALLBACKS: PresetNicheOption[] = [
 function normalizeNicheVariantEntry(value: unknown, index: number): NicheVariant | null {
   if (typeof value === 'string') {
     const variant = value.trim();
-    return variant ? { variant, description: '' } : null;
+    return variant ? sanitizeNicheVariant({ variant, description: '' }, index) : null;
   }
 
   if (!value || typeof value !== 'object') {
@@ -2582,37 +3328,145 @@ function normalizeNicheVariantEntry(value: unknown, index: number): NicheVariant
     return null;
   }
 
-  return {
+  return sanitizeNicheVariant({
     variant,
     description: description || `Varianta ${index + 1}`,
+  }, index);
+}
+
+function normalizeDiscoverAudience(input: NicheDiscoverPhaseAInput): string {
+  if (input.gender === 'femei') {
+    return 'femei';
+  }
+
+  if (input.gender === 'barbati') {
+    return 'bărbați';
+  }
+
+  return 'persoane';
+}
+
+function normalizeDiscoverAge(input: NicheDiscoverPhaseAInput): string {
+  return input.ageRanges.length ? input.ageRanges.join(', ') : '25-45';
+}
+
+function normalizeOutcomeForTitle(value: string): string {
+  const normalized = normalizeTextValue(value);
+  if (!normalized) {
+    return 'Rezultate sustenabile';
+  }
+
+  if (/^să\s+/i.test(normalized)) {
+    const lower = normalized.toLowerCase();
+    if (lower.includes('slabeasca')) return 'Slăbire sustenabilă';
+    if (lower.includes('tonifieze')) return 'Tonifiere și formă fizică';
+    if (lower.includes('energie')) return 'Mai multă energie și echilibru';
+    return 'Progres clar și sustenabil';
+  }
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function normalizeOutcomeForSentence(value: string): string {
+  const normalized = normalizeTextValue(value);
+  if (!normalized) {
+    return 'rezultate sustenabile';
+  }
+
+  const lower = normalized.toLowerCase();
+  if (lower.startsWith('să ')) {
+    return lower;
+  }
+  if (lower.includes('slăb')) return 'să slăbească într-un mod sustenabil';
+  if (lower.includes('tonifi')) return 'să se tonifieze fără extreme';
+  if (lower.includes('energie')) return 'să aibă mai multă energie și control';
+  if (lower.includes('durer') || lower.includes('disconfort')) {
+    return 'să scape de durere și disconfort';
+  }
+  return `să obțină ${normalized.toLowerCase()}`;
+}
+
+function normalizeProblemForSentence(value: string): string {
+  const normalized = normalizeTextValue(value);
+  if (!normalized) {
+    return 'lipsa de claritate și consecvență';
+  }
+
+  const lower = normalized.toLowerCase();
+  if (lower.startsWith('lipsa de ')) {
+    return normalized.toLowerCase();
+  }
+
+  return normalized.charAt(0).toLowerCase() + normalized.slice(1);
+}
+
+function normalizeSituationForSentence(value: string): string {
+  const normalized = normalizeTextValue(value);
+  if (!normalized) {
+    return 'au nevoie de o abordare realistă';
+  }
+
+  return normalized
+    .replace(/^c[âa]nd\s+/i, '')
+    .replace(/^că\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[A-ZĂÂÎȘȚ]/, (char) => char.toLowerCase());
+}
+
+function buildVariantDescriptionFromTitle(title: string): string {
+  const normalized = normalizeTextValue(title);
+  if (!normalized) {
+    return 'O direcție clară, cu un public bine definit, o problemă centrală recognoscibilă și o promisiune care poate fi rafinată mai departe în pasul următor.';
+  }
+
+  return `O direcție clară pentru ${normalized.toLowerCase()}, cu un public bine conturat și un mesaj ușor de rafinat mai departe. Varianta scoate în evidență problema principală a clientului și tipul de rezultat pe care îl urmărește, fără să alunece în promisiuni exagerate.`;
+}
+
+function sanitizeNicheVariant(variant: NicheVariant, index: number): NicheVariant {
+  const fallbackTitle = `Varianta ${index + 1}`;
+  const cleanedTitle = normalizeTextValue(variant.variant)
+    .replace(/^să\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const rawDescription = normalizeTextValue(variant.description)
+    .replace(/spre să /gi, 'spre ')
+    .replace(/către să /gi, 'către ')
+    .replace(/că când /gi, 'că ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const cleanedDescription =
+    /^varianta\s+\d+$/i.test(rawDescription) || /^loading\.\.\.$/i.test(rawDescription)
+      ? ''
+      : rawDescription;
+
+  return {
+    variant: cleanedTitle || fallbackTitle,
+    description: cleanedDescription || buildVariantDescriptionFromTitle(cleanedTitle || fallbackTitle),
   };
 }
 
 function buildFallbackNicheVariants(input: NicheDiscoverPhaseAInput): NicheVariant[] {
-  const audience =
-    input.gender === 'femei'
-      ? 'femei'
-      : input.gender === 'barbati'
-        ? 'bărbați'
-        : 'adulți';
-  const ages = input.ageRanges.length ? input.ageRanges.join(', ') : '25-45 ani';
-  const topSituation = input.valueSituations[0] || 'vor rezultate realiste';
-  const topProblem = input.commonProblems[0] || 'nu reușesc să rămână constanți';
-  const topOutcome = input.primaryOutcome || 'slăbire sustenabilă';
+  const audience = normalizeDiscoverAudience(input);
+  const ages = normalizeDiscoverAge(input);
+  const topSituation = normalizeSituationForSentence(input.valueSituations[0] || '');
+  const topProblem = normalizeProblemForSentence(input.commonProblems[0] || '');
+  const topOutcomeTitle = normalizeOutcomeForTitle(input.primaryOutcome || '');
+  const topOutcomeSentence = normalizeOutcomeForSentence(input.primaryOutcome || '');
 
   return [
-    {
-      variant: `${topOutcome} pentru ${audience} ${ages}`,
-      description: `Pentru ${audience} care ${topSituation.toLowerCase()} și se lovesc frecvent de problema "${topProblem}". Accent pe un proces clar și realist spre ${topOutcome.toLowerCase()}.`,
-    },
-    {
-      variant: `Transformare sustenabilă pentru ${audience} ocupați`,
-      description: `Pentru ${audience} cu program aglomerat care vor rezultate vizibile fără soluții extreme. Mesajul central rezolvă ${topProblem.toLowerCase()} și duce spre ${topOutcome.toLowerCase()}.`,
-    },
-    {
-      variant: `Fitness simplificat pentru ${audience} care vor consistență`,
-      description: `Pentru ${audience} care au nevoie de claritate, structură și pași aplicabili. Nișa pune accent pe contextul lor real și pe progres constant către ${topOutcome.toLowerCase()}.`,
-    },
+    sanitizeNicheVariant({
+      variant: `${topOutcomeTitle} pentru ${audience} ${ages}`,
+      description: `Pentru ${audience} de ${ages} care ${topSituation}. Varianta vorbește despre un proces clar, realist și ușor de urmat pentru cei care vor ${topOutcomeSentence}. Se potrivește bine dacă vrei să comunici ghidaj, claritate și progres vizibil, fără presiune inutilă sau soluții extreme.`,
+    }, 0),
+    sanitizeNicheVariant({
+      variant: `Fitness sustenabil pentru ${audience} cu program aglomerat`,
+      description: `Pentru ${audience} care vor rezultate vizibile, dar se lovesc constant de ${topProblem}. Aici accentul cade pe soluții aplicabile într-un program plin, nu pe perfecțiune. Este o variantă bună dacă vrei să poziționezi antrenamentul ca ceva sustenabil, adaptat vieții reale și ușor de păstrat pe termen lung.`,
+    }, 1),
+    sanitizeNicheVariant({
+      variant: `Transformare realistă pentru ${audience} care vor consecvență`,
+      description: `Pentru ${audience} care au nevoie de structură, claritate și pași aplicabili în viața de zi cu zi. Direcția pune accent pe consecvență, încredere și rezultate sustenabile, nu pe schimbări rapide. Funcționează bine dacă vrei un mesaj mai matur, mai stabil și mai orientat spre progres pe termen lung.`,
+    }, 2),
   ];
 }
 
@@ -2630,7 +3484,14 @@ RĂSPUNSURI ANTRENOR:
 
 Creează EXACT 3 variante de nișă diferite. Fiecare variantă:
 - "variant": Titlul nișei (1 propoziție scurtă, specifică)
-- "description": Descriere mai detaliată (2-3 propoziții despre cine e clientul și ce problemă rezolvi)
+- "description": Descriere mai detaliată (3-4 propoziții)
+
+Pentru fiecare "description":
+- explică clar cui i se potrivește varianta
+- arată ce problemă principală rezolvă
+- explică ce tip de rezultat promite
+- spune ce unghi de mesaj sau poziționare transmite
+- scrie în română naturală, clară, fără formulări corporatiste sau propoziții incomplete
 
 Răspunde DOAR în format JSON strict, fără markdown.
 IMPORTANT:
@@ -2647,7 +3508,7 @@ FORMAT:
   ]
 }`;
 
-  const content = await generateAnthropicJson(prompt, 0.8, 700);
+  const content = await generateGeminiJson(prompt, 0.8, 700);
   const parsed = await parseModelJson<any>(content);
   const rawVariants = Array.isArray(parsed)
     ? parsed
@@ -2709,7 +3570,7 @@ FORMAT:
   ]
 }`;
 
-  const content = await generateAnthropicJson(prompt, 0.7, 900);
+  const content = await generateGeminiJson(prompt, 0.7, 900);
   const parsed = await parseModelJson<any>(content);
   const rawNiches = Array.isArray(parsed)
     ? parsed
@@ -2848,7 +3709,7 @@ FORMAT:
   "positioning": "Mesajul tău de poziționare puternic"
 }`;
 
-  const content = await generateAnthropicJson(prompt, 0.7, 1200);
+  const content = await generateGeminiJson(prompt, 0.7, 1200);
   const parsed = await parseModelJson<Partial<NicheResult>>(content);
   const contextHint = [
     `nișa selectată ${input.selectedNiche}`,
@@ -2861,7 +3722,14 @@ FORMAT:
   ]
     .filter(Boolean)
     .join('; ');
-  return ensureCompleteNicheResult(parsed, contextHint);
+  const fallbackNiche = buildDiscoverFallbackNiche(input);
+  return ensureCompleteNicheResult(
+    parsed,
+    contextHint,
+    fallbackNiche,
+    buildDiscoverFallbackIdealClient(input, fallbackNiche),
+    buildDiscoverFallbackPositioning(input, fallbackNiche)
+  );
 }
 
 // ==================== QUESTIONNAIRE: ICP DAY ====================
@@ -2904,7 +3772,7 @@ Scrie un profil de client ideal natural, în română, 3-4 paragrafe. NU folosi 
 
 Răspunde DOAR cu textul profilului (fără JSON, fără markdown).`;
 
-  const icpProfile = (await generateAnthropicText(prompt, 0.7, 700)) || '';
+  const icpProfile = (await generateGeminiText(prompt, 0.7, 700)) || '';
   return { icpProfile };
 }
 
@@ -3035,7 +3903,7 @@ Răspunde DOAR în format JSON strict, fără markdown:
 
   console.log(`📝 Analyzing ${input.format} text content (${input.text.length} chars)${input.niche ? ` for niche: "${input.niche}"` : ''}...`);
 
-  const content = (await generateAnthropicText(prompt, 0.6, 3000)) || '{}';
+  const content = (await generateGeminiText(prompt, 0.6, 3000)) || '{}';
   console.log(`✅ Text analysis completed (${content.length} chars response)`);
   
   const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '');
@@ -3122,7 +3990,7 @@ Răspunde DOAR JSON strict:
   "angles": ["unghi 1", "unghi 2", "unghi 3"]
 }`;
 
-  const content = (await generateAnthropicText(prompt, 0.65, 1800)) || '{}';
+  const content = (await generateGeminiText(prompt, 0.65, 1800)) || '{}';
   const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '');
   const parsed = JSON.parse(cleaned);
 
@@ -3329,7 +4197,7 @@ Răspunde DOAR JSON valid, fără markdown:
   "complianceRules": ["regulă 1", "regulă 2", "regulă 3"]
 }`;
 
-  const content = (await generateAnthropicText(prompt, 0.35, 2600)) || '{}';
+  const content = (await generateGeminiText(prompt, 0.35, 2600)) || '{}';
   const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '');
   const parsed = JSON.parse(cleaned);
 

@@ -953,7 +953,7 @@ export default function NicheQuick() {
         {generatedResult && (
           <Card className="mt-6">
             <div className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-200">
-              Niche Builder generat și salvat automat în cont.
+              Niche Builder salvat automat în cont.
             </div>
             <div className="space-y-4">
               <div className="rounded-lg border border-dark-200 bg-dark-300 p-5">

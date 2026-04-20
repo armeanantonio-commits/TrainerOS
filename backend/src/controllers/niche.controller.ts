@@ -29,6 +29,8 @@ const quickICPSchema = z.object({
   activeStatus: z.array(z.string()).optional().default([]),
   physicalJobIssue: z.array(z.string()).optional().default([]),
   painDetails: z.array(z.string()).optional().default([]),
+  mainReasons: z.array(z.string()).optional().default([]),
+  primaryReason: z.string().optional().default(''),
   differentiation: z.string().optional().default(''),
   internalObjections: z.array(z.string()).max(2).optional().default([]),
   saveToProfile: z.boolean().optional().default(false),

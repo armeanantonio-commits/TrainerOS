@@ -33,8 +33,13 @@ export default function DailyIdea() {
   });
 
   const [activeTab, setActiveTab] = useState<'reel' | 'carousel' | 'story'>('reel');
-  const hasGeneratedIdea = generateMutation.isSuccess && !!generateMutation.data?.data;
+  const generatedIdeas = generateMutation.data?.data;
+  const hasCompleteIdeaSet =
+    !!generatedIdeas?.reel && !!generatedIdeas?.carousel && !!generatedIdeas?.story;
+  const hasGeneratedIdea = generateMutation.isSuccess && hasCompleteIdeaSet;
+  const hasMalformedIdeaResponse = generateMutation.isSuccess && !hasCompleteIdeaSet;
   const isProcessing = generateMutation.isPending;
+  const activeIdea = generatedIdeas?.[activeTab];
 
   const handleGenerate = (mode: 'niche' | 'general') => {
     setGenerationMode(mode);
@@ -212,24 +217,26 @@ export default function DailyIdea() {
         )}
 
         {/* Error State */}
-        {generateMutation.isError && (
+        {(generateMutation.isError || hasMalformedIdeaResponse) && (
           <Card className="max-w-3xl mx-auto bg-red-500/10 border-red-500/50 text-center py-8">
             <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-4xl">
-                {(generateMutation.error as any)?.response?.status === 429 ? '⏰' : '⚠️'}
+                {!hasMalformedIdeaResponse && (generateMutation.error as any)?.response?.status === 429 ? '⏰' : '⚠️'}
               </span>
             </div>
             <h3 className="text-xl font-bold text-white mb-2">
-              {(generateMutation.error as any)?.response?.status === 429
+              {!hasMalformedIdeaResponse && (generateMutation.error as any)?.response?.status === 429
                 ? 'Limită zilnică atinsă!'
                 : 'Oops! Ceva nu a mers bine'}
             </h3>
             <p className="text-gray-300 mb-6">
-              {(generateMutation.error as any)?.response?.data?.message || 
-               (generateMutation.error as any)?.response?.data?.error ||
-               'Nu am putut genera ideea. Încearcă din nou.'}
+              {hasMalformedIdeaResponse
+                ? 'Am primit un răspuns incomplet pentru una dintre idei. Încearcă din nou.'
+                : (generateMutation.error as any)?.response?.data?.message || 
+                  (generateMutation.error as any)?.response?.data?.error ||
+                  'Nu am putut genera ideea. Încearcă din nou.'}
             </p>
-            {(generateMutation.error as any)?.response?.status === 429 ? (
+            {!hasMalformedIdeaResponse && (generateMutation.error as any)?.response?.status === 429 ? (
               <div className="flex gap-3 justify-center">
                 <Link to="/idea-history">
                   <Button variant="outline">
@@ -323,9 +330,11 @@ export default function DailyIdea() {
             </div>
 
             {/* Display Active Format Idea Card */}
-            <div className="max-w-3xl mx-auto">
-              <IdeaCard idea={generateMutation.data.data[activeTab]} />
-            </div>
+            {activeIdea && (
+              <div className="max-w-3xl mx-auto">
+                <IdeaCard idea={activeIdea} />
+              </div>
+            )}
 
             {/* Actions */}
             <div className="sticky bottom-4 z-20 mx-auto mt-8 flex max-w-3xl justify-center">
@@ -346,7 +355,7 @@ export default function DailyIdea() {
         )}
 
         {/* How It Works */}
-        {!generateMutation.isSuccess && (
+        {!generateMutation.isSuccess && !hasMalformedIdeaResponse && (
           <div className="max-w-3xl mx-auto mt-16">
             <h2 className="text-2xl font-bold text-white text-center mb-8 font-display">
               Cum funcționează Daily Idea Engine?

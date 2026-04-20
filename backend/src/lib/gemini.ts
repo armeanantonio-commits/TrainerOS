@@ -2,6 +2,7 @@ const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 type GeminiRole = 'user' | 'assistant';
+type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
 export interface GeminiMessage {
   role: GeminiRole;
@@ -58,6 +59,22 @@ function buildRequestBody(messages: GeminiMessage[], options: GeminiTextOptions)
   };
 }
 
+function buildPartsRequestBody(parts: GeminiPart[], options: GeminiTextOptions): Record<string, unknown> {
+  return {
+    contents: [
+      {
+        role: 'user',
+        parts,
+      },
+    ],
+    systemInstruction: options.system ? { parts: [{ text: options.system }] } : undefined,
+    generationConfig: {
+      temperature: options.temperature ?? 0.7,
+      maxOutputTokens: options.maxTokens ?? 1024,
+    },
+  };
+}
+
 function extractText(payload: any): string {
   if (!Array.isArray(payload?.candidates)) {
     return '';
@@ -88,6 +105,23 @@ export async function createGeminiText(messages: GeminiMessage[], options: Gemin
       'content-type': 'application/json',
     },
     body: JSON.stringify(buildRequestBody(messages, options)),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini request failed (${response.status}): ${await parseError(response)}`);
+  }
+
+  const payload = await response.json();
+  return extractText(payload).trim();
+}
+
+export async function createGeminiPartsText(parts: GeminiPart[], options: GeminiTextOptions = {}): Promise<string> {
+  const response = await fetch(buildApiUrl('generateContent'), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(buildPartsRequestBody(parts, options)),
   });
 
   if (!response.ok) {
