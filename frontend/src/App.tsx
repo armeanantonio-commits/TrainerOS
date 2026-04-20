@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import CookieBanner from '@/components/CookieBanner';
+import SeoManager from '@/components/SeoManager';
 import Button from '@/components/Button';
 
 // Public Pages
@@ -352,6 +353,7 @@ function App() {
       <Router>
         <ScrollToTop />
         <MetaPixelTracker />
+        <SeoManager />
         <AppFrame />
       </Router>
     </AuthProvider>

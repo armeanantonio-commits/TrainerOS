@@ -1,0 +1,26 @@
+User-agent: *
+Allow: /
+
+Disallow: /dashboard
+Disallow: /niche-finder
+Disallow: /niche-quick
+Disallow: /niche-discover
+Disallow: /content-preferences
+Disallow: /cum-vrei-sa-creezi-content
+Disallow: /daily-idea
+Disallow: /idea-structure
+Disallow: /idea/
+Disallow: /content-review
+Disallow: /feedback/
+Disallow: /idea-history
+Disallow: /settings
+Disallow: /chat
+Disallow: /email
+Disallow: /client-nutrition
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /activate-account
+
+Sitemap: https://traineros.org/sitemap.xml
