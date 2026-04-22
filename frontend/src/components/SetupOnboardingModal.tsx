@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import Button from '@/components/Button';
 
@@ -47,6 +48,35 @@ export default function SetupOnboardingModal({
 }: SetupOnboardingModalProps) {
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const { body, documentElement } = document;
+    const scrollY = window.scrollY;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyPosition = body.style.position;
+    const previousBodyTop = body.style.top;
+    const previousBodyWidth = body.style.width;
+    const previousHtmlOverflow = documentElement.style.overflow;
+
+    documentElement.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+
+    return () => {
+      documentElement.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+      body.style.position = previousBodyPosition;
+      body.style.top = previousBodyTop;
+      body.style.width = previousBodyWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [isOpen]);
+
   const status = useMemo(
     () => ({
       niche: hasNiche,
@@ -65,10 +95,10 @@ export default function SetupOnboardingModal({
     return null;
   }
 
-  return (
-    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center px-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-brand-500/40 bg-dark-300 shadow-2xl shadow-black/40">
-        <div className="p-6 sm:p-8">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:px-4 sm:py-4">
+      <div className="w-full max-w-[22rem] rounded-2xl border border-brand-500/40 bg-dark-300 shadow-2xl shadow-black/40 sm:max-w-2xl">
+        <div className="p-4 sm:p-8">
           <div className="flex items-center justify-between gap-3 mb-3">
             <p className="text-brand-500 text-sm font-semibold">Onboarding Setup</p>
             <button
@@ -80,21 +110,21 @@ export default function SetupOnboardingModal({
               ✕
             </button>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-display font-bold text-white mb-3">
+          <h2 className="mb-2 text-[1.35rem] font-display font-bold leading-tight text-white sm:mb-3 sm:text-3xl">
             Înainte să începi, setează contul în 3 pași
           </h2>
-          <p className="text-gray-300 mb-6">
+          <p className="mb-4 text-sm text-gray-300 sm:mb-6 sm:text-base">
             Parcurge pașii în ordine ca TrainerOS să personalizeze corect ideile și strategiile.
           </p>
 
-          <div className="space-y-3 mb-8">
+          <div className="mb-5 space-y-2.5 sm:mb-8 sm:space-y-3">
             {setupSteps.map((step) => {
               const completed = status[step.key];
               const active = step.key === nextStep.key;
               return (
                 <div
                   key={step.key}
-                  className={`rounded-lg border p-4 ${
+                  className={`rounded-lg border p-3 sm:p-4 ${
                     completed
                       ? 'border-green-500/40 bg-green-500/10'
                       : active
@@ -102,7 +132,7 @@ export default function SetupOnboardingModal({
                         : 'border-dark-200 bg-dark-400/60'
                   }`}
                 >
-                  <p className="text-white font-semibold">{step.title}</p>
+                  <p className="text-sm font-semibold text-white sm:text-base">{step.title}</p>
                   <p className="text-gray-300 text-sm mt-1">{step.description}</p>
                   <p className="text-xs mt-2 font-semibold">
                     {completed ? (
@@ -118,16 +148,17 @@ export default function SetupOnboardingModal({
             })}
           </div>
 
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={onClose}>
+          <div className="flex justify-end gap-2.5 sm:gap-3">
+            <Button variant="outline" size="sm" onClick={onClose}>
               Închide
             </Button>
-            <Button onClick={() => navigate(nextStep.path)}>
-              Continuă cu: {nextStep.title} →
+            <Button size="sm" onClick={() => navigate(nextStep.path)}>
+              Next →
             </Button>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -57,9 +57,11 @@ export default function Login() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-brand-500 rounded-lg flex items-center justify-center">
-              <span className="text-dark-400 font-bold text-2xl font-display">T</span>
-            </div>
+            <img
+              src="/logo.jpeg"
+              alt="TrainerOS logo"
+              className="w-16 h-16 rounded-lg border-2 border-white/20 object-cover"
+            />
             <span className="text-white font-bold text-2xl font-display">TrainerOS</span>
           </Link>
           <h1 className="text-3xl font-bold text-white mt-4 font-display">Bine ai revenit</h1>

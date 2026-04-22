@@ -48,6 +48,10 @@ const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://lo
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const isPrivateNetworkDevOrigin = (origin: string) => {
+  return /^http:\/\/(?:127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(?::\d+)?$/i.test(origin);
+};
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow server-to-server and health checks with no browser Origin header.
@@ -63,8 +67,9 @@ app.use(cors({
 
     const isTrainerOsSubdomain = /^https:\/\/([a-z0-9-]+\.)?traineros\.org$/i.test(origin);
     const isLocalhostDev = /^http:\/\/localhost:\d+$/i.test(origin);
+    const isPrivateNetworkDev = isPrivateNetworkDevOrigin(origin);
 
-    if (isTrainerOsSubdomain || isLocalhostDev) {
+    if (isTrainerOsSubdomain || isLocalhostDev || isPrivateNetworkDev) {
       callback(null, true);
       return;
     }

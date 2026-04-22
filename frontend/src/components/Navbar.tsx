@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Button from './Button';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,6 +7,13 @@ export default function Navbar() {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navRef = useRef<HTMLElement | null>(null);
+  const desktopNavItemBase =
+    'group relative inline-flex min-h-[46px] items-center justify-center whitespace-nowrap rounded-full border px-4 py-2.5 text-[14px] font-semibold tracking-[-0.01em] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/45';
+  const desktopNavItemIdle =
+    'border-white/8 bg-white/[0.025] text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:border-cyan-200/40 hover:bg-[linear-gradient(180deg,rgba(140,248,212,0.14),rgba(114,202,255,0.16))] hover:text-white hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_22px_rgba(114,202,255,0.16)]';
+  const desktopNavItemActive =
+    'border-cyan-300/30 bg-[linear-gradient(180deg,rgba(114,202,255,0.16),rgba(114,202,255,0.07))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_24px_rgba(114,202,255,0.14)] after:absolute after:inset-x-4 after:bottom-[7px] after:h-px after:rounded-full after:bg-cyan-200/80';
 
   const navLinks = user
       ? [
@@ -26,10 +33,39 @@ export default function Navbar() {
     setMobileMenuOpen(false);
   };
 
+  useEffect(() => {
+    if (!mobileMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (!navRef.current?.contains(target)) {
+        closeMobileMenu();
+      }
+    };
+
+    const handleScroll = () => {
+      closeMobileMenu();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [mobileMenuOpen]);
+
   return (
-    <nav className="sticky top-0 z-50 px-3 pt-3 sm:px-5">
+    <nav ref={navRef} className="sticky top-0 z-50 px-3 pt-3 sm:px-5">
       <div className="console-panel-strong mx-auto max-w-7xl rounded-[28px] px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-[72px] items-center justify-between gap-4">
+        <div className="flex min-h-[70px] items-center justify-between gap-4 lg:gap-5">
           {/* Logo */}
           <Link to={user ? '/dashboard' : '/'} className="flex items-center gap-3">
             <div className="relative">
@@ -37,25 +73,26 @@ export default function Navbar() {
               <img
                 src="/logo.jpeg"
                 alt="TrainerOS Logo"
-                className="relative h-11 w-11 rounded-2xl border border-cyan-300/25 object-cover shadow-[0_0_24px_rgba(114,202,255,0.12)]"
+                className="relative h-11 w-11 rounded-[20px] border border-cyan-300/25 object-cover shadow-[0_0_24px_rgba(114,202,255,0.12)]"
               />
             </div>
             <div>
               <span className="console-kicker block text-[10px]">TrainerOS Console</span>
-              <span className="text-lg font-bold text-white font-display">TrainerOS</span>
+              <span className="font-display text-lg font-bold text-white">TrainerOS</span>
             </div>
           </Link>
 
-          <div className="hidden xl:flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.035] px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+          <div className="hidden xl:flex flex-1 items-center justify-center px-2">
+            <div className="inline-flex max-w-full items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {navLinks.map((link) => (
               link.disabled ? (
                 <span
                   key={link.path}
-                  className="inline-flex cursor-not-allowed items-center gap-2 rounded-full border border-white/6 bg-white/[0.02] px-4 py-2 text-sm font-medium text-slate-500"
+                  className="inline-flex min-h-[46px] cursor-not-allowed items-center gap-2 whitespace-nowrap rounded-full border border-white/6 bg-white/[0.02] px-4 py-2.5 text-[14px] font-semibold text-slate-500"
                 >
                   {link.name}
                   {link.badge && (
-                    <span className="rounded-full border border-white/8 bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                    <span className="rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">
                       {link.badge}
                     </span>
                   )}
@@ -64,22 +101,23 @@ export default function Navbar() {
                 <Link
                   key={link.path}
                   to={link.path}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                  className={`${desktopNavItemBase} ${
                     location.pathname === link.path
-                      ? 'bg-cyan-300/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_0_18px_rgba(114,202,255,0.12)]'
-                      : 'text-slate-300 hover:bg-white/[0.045] hover:text-white'
+                      ? desktopNavItemActive
+                      : desktopNavItemIdle
                   }`}
                 >
                   {link.name}
                 </Link>
               )
             ))}
+            </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex shrink-0 items-center gap-3">
             {user ? (
               <>
-                <div className="hidden lg:block rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 text-sm text-slate-300">
+                <div className="hidden 2xl:block rounded-full border border-white/8 bg-white/[0.04] px-4 py-2.5 text-sm text-slate-300">
                   {user.name}
                 </div>
                 <Link to="/settings#plans">
@@ -110,7 +148,7 @@ export default function Navbar() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 text-white md:hidden"
+            className="rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 text-white transition-colors hover:border-cyan-300/25 hover:bg-cyan-300/[0.08] md:hidden"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? (

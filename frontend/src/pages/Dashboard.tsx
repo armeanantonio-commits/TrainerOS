@@ -116,7 +116,7 @@ export default function Dashboard() {
     !isSetupComplete;
 
   return (
-    <div className="min-h-screen py-12">
+    <div className="min-h-screen overflow-x-hidden py-12">
       <SetupOnboardingModal
         isOpen={shouldShowSetupOnboarding}
         hasNiche={hasNicheSetup}
@@ -169,7 +169,7 @@ export default function Dashboard() {
           </div>
         </div>
       ) : null}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl overflow-x-hidden px-4 sm:px-6 lg:px-8">
         {/* Header */}
         {showSetupCompletedBanner ? (
           <Card className="mb-6 border-emerald-300/25 bg-[linear-gradient(135deg,rgba(16,185,129,0.12),rgba(8,18,30,0.85))]">
@@ -188,15 +188,15 @@ export default function Dashboard() {
           </Card>
         ) : null}
 
-        <div className="console-panel-strong mb-8 rounded-[34px] p-6 sm:p-8">
-          <div className="mb-8 flex items-start justify-between flex-wrap gap-4">
-            <div>
+        <div className="console-panel-strong mb-8 overflow-hidden rounded-[34px] p-6 sm:p-8">
+          <div className="mb-8 flex min-w-0 flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
               <p className="console-kicker mb-3">Workspace Overview</p>
               <h1 className="text-3xl font-bold text-white mb-2 font-display sm:text-4xl">
                 Bine ai venit, {user?.name || 'Antrenor'}
               </h1>
               {profile?.niche ? (
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex min-w-0 w-full flex-wrap items-center gap-3">
                   <div
                     role="button"
                     tabIndex={0}
@@ -207,19 +207,19 @@ export default function Dashboard() {
                         setIsNicheModalOpen(true);
                       }
                     }}
-                    className="max-w-full rounded-[20px] border border-cyan-300/18 bg-white/[0.04] px-4 py-3 text-left transition hover:border-cyan-300/28 hover:bg-white/[0.06]"
+                    className="min-w-0 max-w-[calc(100vw-4.5rem)] overflow-hidden rounded-[18px] border border-cyan-300/18 bg-white/[0.04] px-3 py-2.5 text-left transition hover:border-cyan-300/28 hover:bg-white/[0.06] sm:max-w-full sm:rounded-[20px] sm:px-4 sm:py-3"
                     aria-haspopup="dialog"
                     aria-expanded={isNicheModalOpen}
                     title="Arată nișa completă"
                   >
                     <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-slate-400">Nișa ta</p>
-                    <div className="mt-1 flex items-start gap-3">
-                      <p className="max-w-[34rem] truncate text-base font-semibold text-cyan-100 sm:text-lg">
+                    <div className="mt-1 flex min-w-0 items-start gap-3">
+                      <p className="min-w-0 flex-1 truncate text-sm font-semibold text-cyan-100 sm:text-lg">
                         {profile.niche}
                       </p>
                       <Link
                         to="/niche-finder"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-slate-300 transition hover:border-cyan-300/28 hover:bg-white/[0.08] hover:text-white"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-slate-300 transition hover:border-cyan-300/28 hover:bg-white/[0.08] hover:text-white"
                         aria-label="Editează nișa"
                         title="Editează nișa"
                         onClick={(event) => event.stopPropagation()}
@@ -231,7 +231,7 @@ export default function Dashboard() {
                 </div>
               ) : null}
             </div>
-            <Link to="/settings">
+            <Link to="/settings" className="shrink-0 self-start">
               <Button variant="outline" className="flex items-center gap-2">
                 Setări
               </Button>
