@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'timers/promises';
+import { isProductionEnvironment } from '../lib/environment.js';
 
 const SENDGRID_API_URL = 'https://api.sendgrid.com/v3/mail/send';
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || '';
@@ -27,7 +28,7 @@ function ensureMailConfig(): void {
     return;
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  if (isProductionEnvironment()) {
     throw new Error('SENDGRID_API_KEY is missing');
   }
 
@@ -117,7 +118,7 @@ async function sendEmail(payload: EmailPayload): Promise<void> {
       throw new Error('SendGrid request timed out');
     }
 
-    if (process.env.NODE_ENV !== 'production') {
+    if (!isProductionEnvironment()) {
       await delay(50);
       console.error('Failed to send email:', error?.message || error);
     }

@@ -20,6 +20,7 @@ import adminRoutes from './routes/admin.routes.js';
 import chatRoutes from './routes/chat.routes.js';
 import emailRoutes from './routes/email.routes.js';
 import nutritionRoutes from './routes/nutrition.routes.js';
+import { getAppEnvironment, isProductionEnvironment } from './lib/environment.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,7 +30,7 @@ const PORT = process.env.PORT || 3000;
 const jsonParser = express.json();
 const urlencodedParser = express.urlencoded({ extended: true });
 
-if (process.env.TRUST_PROXY === '1' || process.env.NODE_ENV === 'production') {
+if (process.env.TRUST_PROXY === '1' || isProductionEnvironment()) {
   app.set('trust proxy', 1);
 }
 app.disable('x-powered-by');
@@ -111,7 +112,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
+    environment: getAppEnvironment(),
   });
 });
 
@@ -167,7 +168,7 @@ app.listen(PORT, () => {
    - POST /api/feedback/analyze
    - GET  /api/feedback/history
 
-Environment: ${process.env.NODE_ENV || 'development'}
+Environment: ${getAppEnvironment()}
 CORS Origins: ${(process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:5174')}
   `);
 });
