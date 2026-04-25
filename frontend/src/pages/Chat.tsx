@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
+import { buildApiUrl } from '@/services/api';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -76,7 +77,7 @@ export default function Chat() {
     abortRef.current = abortController;
 
     try {
-      const response = await fetch('/api/chat/stream', {
+      const response = await fetch(buildApiUrl('/chat/stream'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,7 +92,18 @@ export default function Chat() {
 
       if (!response.ok || !response.body) {
         const text = await response.text();
-        throw new Error(text || 'Nu am putut porni conversația.');
+        let errorMessage = 'Nu am putut porni conversația.';
+
+        if (text) {
+          try {
+            const parsed = JSON.parse(text);
+            errorMessage = parsed?.message || parsed?.error || text;
+          } catch {
+            errorMessage = text;
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
       const reader = response.body.getReader();

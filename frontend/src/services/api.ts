@@ -17,6 +17,11 @@ const apiBaseUrl = import.meta.env.DEV
   ? '/api'
   : normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
 
+export function buildApiUrl(pathname: string): string {
+  const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return `${apiBaseUrl}${normalizedPath}`;
+}
+
 const api = axios.create({
   baseURL: apiBaseUrl,
   headers: {

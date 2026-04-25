@@ -20,6 +20,7 @@ export async function authenticate(
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.warn(`[auth] Missing bearer token for ${req.method} ${req.originalUrl}`);
       res.status(401).json({ error: 'No token provided' });
       return;
     }
@@ -30,6 +31,8 @@ export async function authenticate(
     req.user = user;
     next();
   } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Unknown auth error';
+    console.warn(`[auth] Authentication failed for ${req.method} ${req.originalUrl}: ${reason}`);
     res.status(401).json({ error: 'Invalid token' });
   }
 }
