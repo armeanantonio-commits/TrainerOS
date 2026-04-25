@@ -1,22 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button from '@/components/Button';
-
-const CONSENT_KEY = 'traineros_cookie_consent_v1';
-
-interface CookieConsent {
-  accepted: boolean;
-  analytics: boolean;
-  updatedAt: string;
-}
-
-function saveConsent(consent: CookieConsent): void {
-  localStorage.setItem(CONSENT_KEY, JSON.stringify(consent));
-}
-
-function hasStoredConsent(): boolean {
-  return !!localStorage.getItem(CONSENT_KEY);
-}
+import { hasStoredCookieConsent, saveCookieConsent } from '@/lib/cookieConsent';
 
 export default function CookieBanner() {
   const [visible, setVisible] = useState(false);
@@ -24,11 +9,11 @@ export default function CookieBanner() {
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
 
   useEffect(() => {
-    setVisible(!hasStoredConsent());
+    setVisible(!hasStoredCookieConsent());
   }, []);
 
   const handleAcceptAll = () => {
-    saveConsent({
+    saveCookieConsent({
       accepted: true,
       analytics: true,
       updatedAt: new Date().toISOString(),
@@ -37,7 +22,7 @@ export default function CookieBanner() {
   };
 
   const handleRejectOptional = () => {
-    saveConsent({
+    saveCookieConsent({
       accepted: true,
       analytics: false,
       updatedAt: new Date().toISOString(),
@@ -46,7 +31,7 @@ export default function CookieBanner() {
   };
 
   const handleSavePreferences = () => {
-    saveConsent({
+    saveCookieConsent({
       accepted: true,
       analytics: analyticsEnabled,
       updatedAt: new Date().toISOString(),
@@ -63,8 +48,8 @@ export default function CookieBanner() {
       <div className="console-panel-strong max-w-5xl mx-auto rounded-[28px] p-4 sm:p-6 shadow-2xl">
         <h3 className="text-white text-lg font-semibold mb-2">Cookie Settings</h3>
         <p className="text-slate-300/78 text-sm mb-4">
-          We use essential cookies to keep TrainerOS secure and working properly. Optional analytics cookies help us
-          improve performance and user experience. See our{' '}
+          We use essential cookies to keep TrainerOS secure and working properly. Optional analytics and marketing
+          cookies help us measure traffic, understand conversions, and improve campaigns. See our{' '}
           <Link to="/privacy" className="text-cyan-200 hover:text-white">
             Privacy Policy
           </Link>{' '}
@@ -87,8 +72,8 @@ export default function CookieBanner() {
 
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-white font-medium text-sm">Analytics cookies</p>
-                <p className="text-slate-400 text-xs">Help us understand usage and improve features</p>
+                <p className="text-white font-medium text-sm">Analytics and marketing cookies</p>
+                <p className="text-slate-400 text-xs">Help us measure usage, conversions, and campaign performance</p>
               </div>
               <label className="inline-flex items-center gap-2 text-sm text-slate-300">
                 <input

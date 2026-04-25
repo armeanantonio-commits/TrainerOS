@@ -1,7 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link, useNavigate, useNavigationType } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { initMetaPixel, trackMetaPageView } from '@/lib/metaPixel';
+import { COOKIE_CONSENT_UPDATED_EVENT, hasAnalyticsConsent } from '@/lib/cookieConsent';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -70,20 +71,39 @@ function ScrollToTop() {
 
 function MetaPixelTracker() {
   const { pathname, search } = useLocation();
-  const hasTrackedInitialPageView = useRef(false);
+  const lastTrackedPath = useRef<string | null>(null);
+  const [isTrackingEnabled, setIsTrackingEnabled] = useState(() => hasAnalyticsConsent());
 
   useEffect(() => {
-    initMetaPixel();
+    const syncTrackingConsent = () => {
+      setIsTrackingEnabled(hasAnalyticsConsent());
+    };
+
+    syncTrackingConsent();
+    window.addEventListener(COOKIE_CONSENT_UPDATED_EVENT, syncTrackingConsent);
+    window.addEventListener('storage', syncTrackingConsent);
+
+    return () => {
+      window.removeEventListener(COOKIE_CONSENT_UPDATED_EVENT, syncTrackingConsent);
+      window.removeEventListener('storage', syncTrackingConsent);
+    };
   }, []);
 
   useEffect(() => {
-    if (!hasTrackedInitialPageView.current) {
-      hasTrackedInitialPageView.current = true;
+    if (!isTrackingEnabled) {
+      return;
+    }
+
+    const currentPath = `${pathname}${search}`;
+
+    initMetaPixel();
+    if (lastTrackedPath.current === currentPath) {
       return;
     }
 
     trackMetaPageView();
-  }, [pathname, search]);
+    lastTrackedPath.current = currentPath;
+  }, [isTrackingEnabled, pathname, search]);
 
   return null;
 }

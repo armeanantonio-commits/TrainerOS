@@ -1,3 +1,5 @@
+import { hasAnalyticsConsent } from '@/lib/cookieConsent';
+
 const META_PIXEL_ID = '1251519633819969';
 
 declare global {
@@ -23,7 +25,7 @@ function canUseDom() {
 }
 
 export function initMetaPixel() {
-  if (!canUseDom() || hasInitializedMetaPixel) {
+  if (!canUseDom() || hasInitializedMetaPixel || !hasAnalyticsConsent()) {
     return;
   }
 
@@ -70,7 +72,7 @@ export function initMetaPixel() {
 }
 
 export function trackMetaPageView() {
-  if (!window.fbq) {
+  if (!canUseDom() || !hasAnalyticsConsent() || !window.fbq) {
     return;
   }
 
@@ -78,7 +80,7 @@ export function trackMetaPageView() {
 }
 
 export function trackMetaCompleteRegistration() {
-  if (!window.fbq) {
+  if (!canUseDom() || !hasAnalyticsConsent() || !window.fbq) {
     return;
   }
 
