@@ -41,11 +41,11 @@ export default function Navbar() {
   };
 
   const handleLanguageChange = (preferredLanguage: PreferredLanguage) => {
+    setGuestLanguage(preferredLanguage);
     if (user) {
       languageMutation.mutate(preferredLanguage);
       return;
     }
-    setGuestLanguage(preferredLanguage);
   };
 
   const languageMutation = useMutation({
@@ -55,6 +55,9 @@ export default function Navbar() {
     },
     onSuccess: async () => {
       await refreshUser();
+    },
+    onError: (error) => {
+      console.error('Failed to persist preferred language on backend:', error);
     },
   });
 

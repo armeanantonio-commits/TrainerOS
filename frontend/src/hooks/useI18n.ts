@@ -1161,7 +1161,8 @@ export function useI18n() {
     }
     return window.localStorage.getItem('preferredLanguage') === 'en' ? 'en' : 'ro';
   });
-  const language: Language = user?.preferredLanguage === 'en' ? 'en' : guestLanguage;
+  const accountLanguage: Language = user?.preferredLanguage === 'en' ? 'en' : 'ro';
+  const language: Language = guestLanguage ?? accountLanguage;
 
   const setGuestLanguage = (nextLanguage: Language) => {
     if (typeof window !== 'undefined') {
@@ -1188,6 +1189,19 @@ export function useI18n() {
       window.removeEventListener(GUEST_LANGUAGE_UPDATED_EVENT, syncGuestLanguage);
     };
   }, []);
+
+  useEffect(() => {
+    if (!user || typeof window === 'undefined') {
+      return;
+    }
+
+    const localPreferredLanguage = window.localStorage.getItem('preferredLanguage');
+    if (localPreferredLanguage !== 'ro' && localPreferredLanguage !== 'en') {
+      const normalizedAccountLanguage: Language = user.preferredLanguage === 'en' ? 'en' : 'ro';
+      window.localStorage.setItem('preferredLanguage', normalizedAccountLanguage);
+      setGuestLanguageState(normalizedAccountLanguage);
+    }
+  }, [user]);
 
   const t = (key: TranslationKey, values?: Record<string, string | number>) => {
     let value: string = translations[language][key] || translations.ro[key] || key;
