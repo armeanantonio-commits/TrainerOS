@@ -19,27 +19,6 @@ type SetupStep = {
   path: string;
 };
 
-const setupSteps: SetupStep[] = [
-  {
-    key: 'niche',
-    title: '1) Setează nișa',
-    description: 'Completează Niche Finder ca să avem context clar pentru toate generările.',
-    path: '/niche-finder',
-  },
-  {
-    key: 'brandVoice',
-    title: '2) Configurează Brand Voice',
-    description: 'Stabilește tonul și stilul tău pentru scripturi care sună ca tine.',
-    path: '/content-preferences',
-  },
-  {
-    key: 'contentCreation',
-    title: '3) Cum vrei să creezi content',
-    description: 'Alege formatul tău de livrare ca ideile să fie ușor de executat.',
-    path: '/cum-vrei-sa-creezi-content',
-  },
-];
-
 export default function SetupOnboardingModal({
   isOpen,
   hasNiche,
@@ -49,6 +28,29 @@ export default function SetupOnboardingModal({
 }: SetupOnboardingModalProps) {
   const navigate = useNavigate();
   const { t } = useI18n();
+  const setupSteps: SetupStep[] = useMemo(
+    () => [
+      {
+        key: 'niche',
+        title: t('onboarding.step1Title'),
+        description: t('onboarding.step1Description'),
+        path: '/niche-finder',
+      },
+      {
+        key: 'brandVoice',
+        title: t('onboarding.step2Title'),
+        description: t('onboarding.step2Description'),
+        path: '/content-preferences',
+      },
+      {
+        key: 'contentCreation',
+        title: t('onboarding.step3Title'),
+        description: t('onboarding.step3Description'),
+        path: '/cum-vrei-sa-creezi-content',
+      },
+    ],
+    [t]
+  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -107,16 +109,16 @@ export default function SetupOnboardingModal({
               type="button"
               onClick={onClose}
               className="text-gray-400 hover:text-white transition-colors"
-              aria-label="Închide onboarding"
+              aria-label={t('onboarding.closeAriaLabel')}
             >
               ✕
             </button>
           </div>
           <h2 className="mb-2 text-[1.35rem] font-display font-bold leading-tight text-white sm:mb-3 sm:text-3xl">
-            Înainte să începi, setează contul în 3 pași
+            {t('onboarding.title')}
           </h2>
           <p className="mb-4 text-sm text-gray-300 sm:mb-6 sm:text-base">
-            Parcurge pașii în ordine ca TrainerOS să personalizeze corect ideile și strategiile.
+            {t('onboarding.subtitle')}
           </p>
 
           <div className="mb-5 space-y-2.5 sm:mb-8 sm:space-y-3">
@@ -138,11 +140,11 @@ export default function SetupOnboardingModal({
                   <p className="text-gray-300 text-sm mt-1">{step.description}</p>
                   <p className="text-xs mt-2 font-semibold">
                     {completed ? (
-                      <span className="text-green-400">Completat</span>
+                      <span className="text-green-400">{t('onboarding.statusCompleted')}</span>
                     ) : active ? (
-                      <span className="text-brand-500">Pas curent</span>
+                      <span className="text-brand-500">{t('onboarding.statusCurrent')}</span>
                     ) : (
-                      <span className="text-gray-500">Blocat până termini pasul anterior</span>
+                      <span className="text-gray-500">{t('onboarding.statusLocked')}</span>
                     )}
                   </p>
                 </div>
@@ -152,7 +154,7 @@ export default function SetupOnboardingModal({
 
           <div className="flex justify-end gap-2.5 sm:gap-3">
             <Button variant="outline" size="sm" onClick={onClose}>
-              Închide
+              {t('common.close')}
             </Button>
             <Button size="sm" onClick={() => navigate(nextStep.path)}>
               {t('onboarding.next')}
