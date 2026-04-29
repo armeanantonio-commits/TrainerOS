@@ -180,6 +180,15 @@ export const ideaAPI = {
   generateMultiFormat: (data?: { general?: boolean }) => api.post('/idea/generate/multi-format', data || {}),
   structure: (data: { ideaText: string }) => api.post('/idea/structure', data),
   history: () => api.get('/idea/history'),
+  translate: (data: {
+    targetLanguage: 'ro' | 'en';
+    ideas: Array<{
+      id: string;
+      hook?: string;
+      cta?: string;
+      script?: unknown;
+    }>;
+  }) => api.post('/idea/translate', data),
 };
 
 // Feedback API

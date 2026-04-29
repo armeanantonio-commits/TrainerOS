@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
 import { ideaAPI } from '@/services/api';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
@@ -7,11 +8,48 @@ import { formatDate } from '@/lib/utils';
 import { useI18n } from '@/hooks/useI18n';
 
 export default function IdeaHistory() {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['idea-history'],
     queryFn: () => ideaAPI.history(),
   });
+  const ideas = data?.data?.ideas || [];
+  const translationPayload = useMemo(
+    () =>
+      ideas.map((idea: any) => ({
+        id: idea.id,
+        hook: idea.hook || '',
+        cta: idea.cta || '',
+        script: idea.script || [],
+      })),
+    [ideas]
+  );
+  const translationKey = useMemo(
+    () => translationPayload.map((idea: any) => `${idea.id}:${idea.hook}:${idea.cta}`).join('|'),
+    [translationPayload]
+  );
+  const { data: translatedIdeasData } = useQuery({
+    queryKey: ['idea-history-translated', language, translationKey],
+    queryFn: () =>
+      ideaAPI.translate({
+        targetLanguage: language,
+        ideas: translationPayload,
+      }),
+    enabled: translationPayload.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+  const translatedById = useMemo(() => {
+    const list = translatedIdeasData?.data?.ideas || [];
+    return new Map(list.map((idea: any) => [idea.id, idea]));
+  }, [translatedIdeasData]);
+  const localizedIdeas = useMemo(
+    () =>
+      ideas.map((idea: any) => {
+        const translated = translatedById.get(idea.id);
+        return translated ? { ...idea, ...translated } : idea;
+      }),
+    [ideas, translatedById]
+  );
 
   return (
     <div className="min-h-screen bg-dark-400 py-12">
@@ -47,9 +85,9 @@ export default function IdeaHistory() {
         )}
 
         {/* Ideas List */}
-        {data?.data.ideas && data.data.ideas.length > 0 ? (
+        {localizedIdeas.length > 0 ? (
           <div className="space-y-4">
-            {data.data.ideas.map((idea: any) => (
+            {localizedIdeas.map((idea: any) => (
               <Link key={idea.id} to={`/idea/${idea.id}`} className="block">
                 <Card hover className="cursor-pointer group">
                   <div className="grid md:grid-cols-12 gap-6">

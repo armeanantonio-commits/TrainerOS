@@ -25,6 +25,13 @@ router.post(
   ideaController.structure
 );
 
+router.post(
+  '/translate',
+  authenticate,
+  requirePlan('FREE_TRIAL', 'STARTER', 'PRO', 'ELITE', 'MAX'),
+  ideaController.translate
+);
+
 router.get(
   '/history',
   authenticate,

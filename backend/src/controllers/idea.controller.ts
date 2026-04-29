@@ -22,6 +22,17 @@ const generateMultiFormatSchema = z.object({
 const structureIdeaSchema = z.object({
   ideaText: z.string().min(10).max(4000),
 });
+const translateIdeasSchema = z.object({
+  targetLanguage: z.enum(['ro', 'en']),
+  ideas: z.array(
+    z.object({
+      id: z.string().min(1),
+      hook: z.string().optional().default(''),
+      cta: z.string().optional().default(''),
+      script: z.unknown().optional(),
+    })
+  ).max(20),
+});
 
 const RECENT_IDEA_CONTEXT_LIMIT = 12;
 const prismaAny = prisma as any;
@@ -519,10 +530,34 @@ export async function structure(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function translate(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const data = translateIdeasSchema.parse(req.body);
+    const result = await openaiService.translateIdeas({
+      targetLanguage: normalizeLanguage(data.targetLanguage),
+      ideas: data.ideas,
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: error.errors });
+      return;
+    }
+    res.status(500).json({ error: error.message || 'Failed to translate ideas' });
+  }
+}
+
 export default {
   generate,
   generateMultiFormat,
   getHistory,
   getById,
   structure,
+  translate,
 };

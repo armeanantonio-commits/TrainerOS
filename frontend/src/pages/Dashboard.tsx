@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import api from '@/services/api';
+import api, { ideaAPI } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
@@ -42,6 +42,43 @@ export default function Dashboard() {
 
   const stats = dashboardData?.stats;
   const recentActivity = dashboardData?.recentActivity;
+  const recentIdeas = recentActivity?.ideas || [];
+  const recentIdeasTranslationPayload = useMemo(
+    () =>
+      recentIdeas.map((idea: any) => ({
+        id: idea.id,
+        hook: idea.hook || '',
+        cta: '',
+        script: [],
+      })),
+    [recentIdeas]
+  );
+  const recentIdeasTranslationKey = useMemo(
+    () => recentIdeasTranslationPayload.map((idea: any) => `${idea.id}:${idea.hook}`).join('|'),
+    [recentIdeasTranslationPayload]
+  );
+  const { data: translatedRecentIdeasData } = useQuery({
+    queryKey: ['dashboard-recent-ideas-translated', language, recentIdeasTranslationKey],
+    queryFn: () =>
+      ideaAPI.translate({
+        targetLanguage: language,
+        ideas: recentIdeasTranslationPayload,
+      }),
+    enabled: recentIdeasTranslationPayload.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+  const translatedRecentIdeasById = useMemo(() => {
+    const list = translatedRecentIdeasData?.data?.ideas || [];
+    return new Map(list.map((idea: any) => [idea.id, idea]));
+  }, [translatedRecentIdeasData]);
+  const localizedRecentIdeas = useMemo(
+    () =>
+      recentIdeas.map((idea: any) => {
+        const translated = translatedRecentIdeasById.get(idea.id) as { hook?: string } | undefined;
+        return translated ? { ...idea, hook: translated.hook || idea.hook } : idea;
+      }),
+    [recentIdeas, translatedRecentIdeasById]
+  );
   const profile = dashboardData?.profile;
   const localizedProfile = useLocalizedNicheProfile({
     niche: profile?.niche,
@@ -535,9 +572,9 @@ export default function Dashboard() {
 
             {isLoading ? (
               <div className="text-center py-8 text-slate-400">{t('dashboard.loading')}</div>
-            ) : recentActivity?.ideas && recentActivity.ideas.length > 0 ? (
+            ) : localizedRecentIdeas.length > 0 ? (
               <div className="space-y-3">
-                {recentActivity.ideas.map((idea: any, index: number) => (
+                {localizedRecentIdeas.map((idea: any, index: number) => (
                   <Link
                     key={`${idea.id}-${index}`}
                     to={`/idea/${idea.id}`}

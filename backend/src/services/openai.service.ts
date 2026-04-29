@@ -5030,6 +5030,22 @@ export interface TranslateNicheProfileResult {
   positioning: string;
 }
 
+export interface IdeaTranslationInput {
+  id: string;
+  hook: string;
+  cta: string;
+  script?: unknown;
+}
+
+export interface TranslateIdeasInput {
+  ideas: IdeaTranslationInput[];
+  targetLanguage: SupportedLanguage;
+}
+
+export interface TranslateIdeasResult {
+  ideas: IdeaTranslationInput[];
+}
+
 function detectLikelyLanguage(text: string): SupportedLanguage | null {
   const value = normalizeTextValue(text).toLowerCase();
   if (!value) return null;
@@ -5649,6 +5665,80 @@ INPUT:
     positioning: shouldKeepOriginalTranslationValue(positioning, translatedPositioning)
       ? positioning
       : translatedPositioning,
+  };
+}
+
+export async function translateIdeas(
+  input: TranslateIdeasInput
+): Promise<TranslateIdeasResult> {
+  const normalizedTargetLanguage = normalizeLanguage(input.targetLanguage);
+  const ideas = (input.ideas || []).slice(0, 20).map((idea) => ({
+    id: String(idea.id || ''),
+    hook: normalizeTextValue(idea.hook) || '',
+    cta: normalizeTextValue(idea.cta) || '',
+    script: idea.script ?? [],
+  }));
+
+  if (ideas.length === 0) {
+    return { ideas: [] };
+  }
+
+  const targetLanguageLabel = normalizedTargetLanguage === 'en' ? 'English' : 'Romanian';
+  const prompt = `You are translating social media ideas for fitness coaches.
+
+Translate all user-facing text into ${targetLanguageLabel}.
+Rules:
+- Preserve exact meaning and persuasion style.
+- Keep emojis and formatting where natural.
+- Keep ids exactly unchanged.
+- Keep script array structure as-is; only translate textual fields like "text" and "description".
+- If content is already in the target language, keep it natural and lightly polish only if needed.
+- Return strict JSON only.
+
+FORMAT:
+{
+  "ideas": [
+    {
+      "id": "idea-id",
+      "hook": "translated hook",
+      "cta": "translated cta",
+      "script": []
+    }
+  ]
+}
+
+INPUT:
+${JSON.stringify({ ideas })}`;
+
+  const content = await generateGeminiJson(prompt, 0.2, 2200);
+  const parsed = await parseModelJson<Partial<TranslateIdeasResult>>(content);
+  const translatedIdeas = Array.isArray(parsed?.ideas) ? parsed.ideas : [];
+
+  const byId = new Map(
+    translatedIdeas
+      .map((idea) => ({
+        id: normalizeTextValue((idea as any)?.id) || '',
+        hook: normalizeTextValue((idea as any)?.hook) || '',
+        cta: normalizeTextValue((idea as any)?.cta) || '',
+        script: (idea as any)?.script,
+      }))
+      .filter((idea) => idea.id)
+      .map((idea) => [idea.id, idea])
+  );
+
+  return {
+    ideas: ideas.map((original) => {
+      const translated = byId.get(original.id);
+      if (!translated) {
+        return original;
+      }
+      return {
+        id: original.id,
+        hook: shouldKeepOriginalTranslationValue(original.hook, translated.hook) ? original.hook : translated.hook,
+        cta: shouldKeepOriginalTranslationValue(original.cta, translated.cta) ? original.cta : translated.cta,
+        script: translated.script ?? original.script,
+      };
+    }),
   };
 }
 
