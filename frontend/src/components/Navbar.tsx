@@ -11,10 +11,10 @@ type PreferredLanguage = 'ro' | 'en';
 export default function Navbar() {
   const location = useLocation();
   const { user, logout, refreshUser } = useAuth();
-  const { t } = useI18n();
+  const { language, t, setGuestLanguage } = useI18n();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navRef = useRef<HTMLElement | null>(null);
-  const currentLanguage: PreferredLanguage = user?.preferredLanguage === 'en' ? 'en' : 'ro';
+  const currentLanguage: PreferredLanguage = language === 'en' ? 'en' : 'ro';
   const desktopNavItemBase =
     'group relative inline-flex min-h-[46px] items-center justify-center whitespace-nowrap rounded-full border px-4 py-2.5 text-[14px] font-semibold tracking-[-0.01em] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/45';
   const desktopNavItemIdle =
@@ -38,6 +38,14 @@ export default function Navbar() {
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
+  };
+
+  const handleLanguageChange = (preferredLanguage: PreferredLanguage) => {
+    if (user) {
+      languageMutation.mutate(preferredLanguage);
+      return;
+    }
+    setGuestLanguage(preferredLanguage);
   };
 
   const languageMutation = useMutation({
@@ -132,30 +140,28 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex shrink-0 items-center gap-3">
-            {user ? (
-              <div className="flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-                {([
-                  ['ro', '🇷🇴'],
-                  ['en', '🇬🇧'],
-                ] as const).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => languageMutation.mutate(value)}
-                    disabled={languageMutation.isPending || currentLanguage === value}
-                    className={`min-w-[52px] rounded-xl px-3 py-2 text-base font-semibold transition ${
-                      currentLanguage === value
-                        ? 'bg-[linear-gradient(135deg,#8CF8D4,#72CAFF)] text-slate-950'
-                        : 'text-slate-300 hover:bg-white/[0.06]'
-                    }`}
-                    aria-label={value === 'ro' ? t('settings.language.ro') : t('settings.language.en')}
-                    title={value === 'ro' ? t('settings.language.ro') : t('settings.language.en')}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            <div className="flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+              {([
+                ['ro', '🇷🇴'],
+                ['en', '🇬🇧'],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => handleLanguageChange(value)}
+                  disabled={languageMutation.isPending || currentLanguage === value}
+                  className={`min-w-[52px] rounded-xl px-3 py-2 text-base font-semibold transition ${
+                    currentLanguage === value
+                      ? 'bg-[linear-gradient(135deg,#8CF8D4,#72CAFF)] text-slate-950'
+                      : 'text-slate-300 hover:bg-white/[0.06]'
+                  }`}
+                  aria-label={value === 'ro' ? t('settings.language.ro') : t('settings.language.en')}
+                  title={value === 'ro' ? t('settings.language.ro') : t('settings.language.en')}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             {user ? (
               <>
                 <div className="hidden 2xl:block rounded-full border border-white/8 bg-white/[0.04] px-4 py-2.5 text-sm text-slate-300">
@@ -239,30 +245,30 @@ export default function Navbar() {
             </div>
 
             <div className="grid gap-3 border-t border-white/8 pt-4">
+              <div className="flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+                {([
+                  ['ro', '🇷🇴'],
+                  ['en', '🇬🇧'],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => handleLanguageChange(value)}
+                    disabled={languageMutation.isPending || currentLanguage === value}
+                    className={`w-full rounded-xl px-4 py-2 text-base font-semibold transition ${
+                      currentLanguage === value
+                        ? 'bg-[linear-gradient(135deg,#8CF8D4,#72CAFF)] text-slate-950'
+                        : 'text-slate-300 hover:bg-white/[0.06]'
+                    }`}
+                    aria-label={value === 'ro' ? t('settings.language.ro') : t('settings.language.en')}
+                    title={value === 'ro' ? t('settings.language.ro') : t('settings.language.en')}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               {user ? (
                 <>
-                  <div className="flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-                    {([
-                      ['ro', '🇷🇴'],
-                      ['en', '🇬🇧'],
-                    ] as const).map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => languageMutation.mutate(value)}
-                        disabled={languageMutation.isPending || currentLanguage === value}
-                        className={`w-full rounded-xl px-4 py-2 text-base font-semibold transition ${
-                          currentLanguage === value
-                            ? 'bg-[linear-gradient(135deg,#8CF8D4,#72CAFF)] text-slate-950'
-                            : 'text-slate-300 hover:bg-white/[0.06]'
-                        }`}
-                        aria-label={value === 'ro' ? t('settings.language.ro') : t('settings.language.en')}
-                        title={value === 'ro' ? t('settings.language.ro') : t('settings.language.en')}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
                   <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
                     {user.name || user.email}
                   </div>

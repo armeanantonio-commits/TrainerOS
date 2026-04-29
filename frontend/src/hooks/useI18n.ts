@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
 type Language = 'ro' | 'en';
+const GUEST_LANGUAGE_UPDATED_EVENT = 'traineros:guest-language-updated';
 
 const translations = {
   ro: {
@@ -1153,7 +1155,39 @@ type TranslationKey = keyof typeof translations.ro;
 
 export function useI18n() {
   const { user } = useAuth();
-  const language: Language = user?.preferredLanguage === 'en' ? 'en' : 'ro';
+  const [guestLanguage, setGuestLanguageState] = useState<Language>(() => {
+    if (typeof window === 'undefined') {
+      return 'ro';
+    }
+    return window.localStorage.getItem('preferredLanguage') === 'en' ? 'en' : 'ro';
+  });
+  const language: Language = user?.preferredLanguage === 'en' ? 'en' : guestLanguage;
+
+  const setGuestLanguage = (nextLanguage: Language) => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('preferredLanguage', nextLanguage);
+      window.dispatchEvent(new Event(GUEST_LANGUAGE_UPDATED_EVENT));
+    }
+    setGuestLanguageState(nextLanguage);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const syncGuestLanguage = () => {
+      setGuestLanguageState(window.localStorage.getItem('preferredLanguage') === 'en' ? 'en' : 'ro');
+    };
+
+    window.addEventListener('storage', syncGuestLanguage);
+    window.addEventListener(GUEST_LANGUAGE_UPDATED_EVENT, syncGuestLanguage);
+
+    return () => {
+      window.removeEventListener('storage', syncGuestLanguage);
+      window.removeEventListener(GUEST_LANGUAGE_UPDATED_EVENT, syncGuestLanguage);
+    };
+  }, []);
 
   const t = (key: TranslationKey, values?: Record<string, string | number>) => {
     let value: string = translations[language][key] || translations.ro[key] || key;
@@ -1165,5 +1199,5 @@ export function useI18n() {
     return value;
   };
 
-  return { language, t };
+  return { language, t, setGuestLanguage };
 }

@@ -1,9 +1,14 @@
+import { useI18n } from '@/hooks/useI18n';
+
 interface PricingToggleProps {
   isAnnual: boolean;
   onToggle: (isAnnual: boolean) => void;
 }
 
 export default function PricingToggle({ isAnnual, onToggle }: PricingToggleProps) {
+  const { language } = useI18n();
+  const isEn = language === 'en';
+
   return (
     <div className="flex items-center justify-center gap-4 mb-12">
       <span
@@ -11,7 +16,7 @@ export default function PricingToggle({ isAnnual, onToggle }: PricingToggleProps
           !isAnnual ? 'text-white' : 'text-gray-500'
         }`}
       >
-        Lunar
+        {isEn ? 'Monthly' : 'Lunar'}
       </span>
       <button
         onClick={() => onToggle(!isAnnual)}
@@ -30,7 +35,7 @@ export default function PricingToggle({ isAnnual, onToggle }: PricingToggleProps
           isAnnual ? 'text-white' : 'text-gray-500'
         }`}
       >
-        Anual <span className="text-brand-500 text-sm">(economisești 20%)</span>
+        {isEn ? 'Annual' : 'Anual'} <span className="text-brand-500 text-sm">({isEn ? 'save 20%' : 'economisești 20%'})</span>
       </span>
     </div>
   );
