@@ -1,32 +1,32 @@
 export default function Terms() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <h1 className="text-4xl font-bold text-white mb-4">TERMS AND CONDITIONS – TRAINEROS</h1>
-      <p className="text-gray-400 mb-10">Last updated: February 18, 2026</p>
+      <h1 className="text-4xl font-bold text-white mb-4">TERMENI ȘI CONDIȚII – TRAINEROS</h1>
+      <p className="text-gray-400 mb-10">Ultima actualizare: 18 februarie 2026</p>
 
       <p className="text-gray-300 leading-relaxed mb-8">
-        Welcome to TrainerOS.
+        Bine ai venit în TrainerOS.
       </p>
 
       <p className="text-gray-300 leading-relaxed mb-10">
-        Please read these Terms and Conditions carefully before using our platform. By accessing or using TrainerOS,
-        you agree to be legally bound by these Terms.
+        Te rugăm să citești cu atenție acești Termeni și Condiții înainte de a utiliza platforma noastră. Prin
+        accesarea sau utilizarea TrainerOS, accepți să fii obligat din punct de vedere juridic de acești Termeni.
       </p>
 
       <div className="space-y-10 text-gray-300 leading-relaxed">
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">1. COMPANY INFORMATION</h2>
-          <p>TrainerOS is operated by:</p>
+          <h2 className="text-2xl font-semibold text-white mb-3">1. INFORMAȚII DESPRE COMPANIE</h2>
+          <p>TrainerOS este operat de:</p>
           <p className="mt-3">
             <strong>SWEVEN S.R.L.</strong>
             <br />
-            Registered in Romania
+            Înregistrată în România
             <br />
-            Registered Office: Str. Principală, Moisei, Maramureș, Romania
+            Sediu social: Str. Principală, Moisei, Maramureș, România
             <br />
-            Company Registration Number: J24/1022/2023
+            Număr de înregistrare: J24/1022/2023
             <br />
-            VAT / CUI: 48485881
+            TVA / CUI: 48485881
             <br />
             Email:{' '}
             <a href="mailto:business@traineros.org" className="text-brand-500">
@@ -34,197 +34,193 @@ export default function Terms() {
             </a>
           </p>
           <p className="mt-3">
-            Throughout this document, “Company”, “we”, “our”, or “TrainerOS” refers to SWEVEN S.R.L.
+            În cuprinsul acestui document, termenii „Compania”, „noi”, „nostru/noastră” sau „TrainerOS” se referă la
+            SWEVEN S.R.L.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">2. DESCRIPTION OF SERVICE</h2>
+          <h2 className="text-2xl font-semibold text-white mb-3">2. DESCRIEREA SERVICIULUI</h2>
           <p>
-            TrainerOS is a Software-as-a-Service (SaaS) platform designed for fitness coaches and online fitness
-            professionals.
+            TrainerOS este o platformă Software-as-a-Service (SaaS) concepută pentru antrenori de fitness și
+            profesioniști din fitness care lucrează online.
           </p>
-          <p className="mt-3">The platform provides tools including but not limited to:</p>
+          <p className="mt-3">Platforma oferă instrumente care includ, fără a se limita la:</p>
           <ul className="list-disc pl-6 mt-2 space-y-1">
-            <li>Niche clarification support</li>
-            <li>Structured daily content direction</li>
-            <li>Content feedback before publishing</li>
-            <li>Positioning and communication tools</li>
+            <li>suport pentru clarificarea nișei;</li>
+            <li>direcție structurată pentru content zilnic;</li>
+            <li>feedback pe content înainte de publicare;</li>
+            <li>instrumente de poziționare și comunicare.</li>
           </ul>
           <p className="mt-3">
-            TrainerOS does not guarantee business results, revenue growth, audience growth, or specific performance
-            outcomes.
+            TrainerOS nu garantează rezultate de business, creștere de venituri, creștere de audiență sau rezultate de
+            performanță specifice.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">3. ACCOUNT REGISTRATION</h2>
-          <p>To use TrainerOS, you must create an account.</p>
-          <p className="mt-3">By creating an account, you confirm that:</p>
+          <h2 className="text-2xl font-semibold text-white mb-3">3. ÎNREGISTRAREA CONTULUI</h2>
+          <p>Pentru a utiliza TrainerOS, trebuie să îți creezi un cont.</p>
+          <p className="mt-3">Prin crearea unui cont, confirmi că:</p>
           <ul className="list-disc pl-6 mt-2 space-y-1">
-            <li>You are at least 18 years old</li>
-            <li>The information you provide is accurate and complete</li>
-            <li>You are responsible for maintaining the confidentiality of your login credentials</li>
+            <li>ai cel puțin 18 ani;</li>
+            <li>informațiile pe care le furnizezi sunt corecte și complete;</li>
+            <li>ești responsabil pentru păstrarea confidențialității datelor tale de autentificare.</li>
           </ul>
-          <p className="mt-3">You are fully responsible for all activity conducted under your account.</p>
+          <p className="mt-3">Ești pe deplin responsabil pentru toate activitățile desfășurate prin contul tău.</p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">4. SUBSCRIPTIONS AND PAYMENTS</h2>
-          <p>TrainerOS operates on a subscription-based model.</p>
+          <h2 className="text-2xl font-semibold text-white mb-3">4. ABONAMENTE ȘI PLĂȚI</h2>
+          <p>TrainerOS funcționează pe bază de abonament.</p>
 
-          <h3 className="text-xl font-semibold text-white mt-4 mb-2">4.1 Payment Processing</h3>
-          <p>All payments are processed securely via Stripe.</p>
-          <p className="mt-2">By subscribing, you also agree to Stripe’s terms and policies.</p>
-          <p className="mt-2">We do not store full payment card details.</p>
+          <h3 className="text-xl font-semibold text-white mt-4 mb-2">4.1 Procesarea plăților</h3>
+          <p>Toate plățile sunt procesate securizat prin Stripe.</p>
+          <p className="mt-2">Prin abonare, accepți și termenii și politicile Stripe.</p>
+          <p className="mt-2">Nu stocăm datele complete ale cardului tău de plată.</p>
           <hr className="border-dark-50 my-4" />
 
-          <h3 className="text-xl font-semibold text-white mt-4 mb-2">4.2 Automatic Renewal</h3>
-          <p>Subscriptions renew automatically at the end of each billing cycle unless canceled before the renewal date.</p>
-          <p className="mt-2">By subscribing, you authorize recurring charges according to your selected billing plan.</p>
+          <h3 className="text-xl font-semibold text-white mt-4 mb-2">4.2 Reînnoire automată</h3>
+          <p>Abonamentele se reînnoiesc automat la finalul fiecărui ciclu de facturare, dacă nu sunt anulate înainte de data reînnoirii.</p>
+          <p className="mt-2">Prin abonare, autorizezi debitări recurente conform planului de facturare selectat.</p>
           <hr className="border-dark-50 my-4" />
 
-          <h3 className="text-xl font-semibold text-white mt-4 mb-2">4.3 Cancellation</h3>
-          <p>You may cancel your subscription at any time from your account settings.</p>
+          <h3 className="text-xl font-semibold text-white mt-4 mb-2">4.3 Anulare</h3>
+          <p>Poți anula abonamentul în orice moment din setările contului tău.</p>
           <p className="mt-2">
-            Cancellation prevents future billing but does not provide a refund for the current billing period.
+            Anularea oprește facturările viitoare, dar nu oferă rambursare pentru perioada curentă deja facturată.
           </p>
-          <p className="mt-2">Access to the platform remains available until the end of the paid billing cycle.</p>
+          <p className="mt-2">Accesul la platformă rămâne disponibil până la finalul ciclului de facturare plătit.</p>
           <hr className="border-dark-50 my-4" />
 
-          <h3 className="text-xl font-semibold text-white mt-4 mb-2">4.4 Refund Policy</h3>
-          <p>Except where required by applicable law, payments are non-refundable.</p>
-          <p className="mt-2">TrainerOS provides immediate access to digital services and content upon subscription.</p>
-          <p className="mt-2">By subscribing to TrainerOS, you expressly agree that:</p>
+          <h3 className="text-xl font-semibold text-white mt-4 mb-2">4.4 Politica de rambursare</h3>
+          <p>Cu excepția cazurilor în care legea aplicabilă prevede altfel, plățile sunt nerambursabile.</p>
+          <p className="mt-2">TrainerOS oferă acces imediat la servicii și conținut digital odată cu abonarea.</p>
+          <p className="mt-2">Prin abonarea la TrainerOS, ești de acord în mod expres că:</p>
           <ul className="list-disc pl-6 mt-2 space-y-1">
-            <li>Access to digital content and services begins immediately upon purchase;</li>
+            <li>accesul la conținutul și serviciile digitale începe imediat după achiziție;</li>
             <li>
-              You waive your right of withdrawal under applicable consumer protection laws once access to the digital
-              service has started.
+              renunți la dreptul de retragere prevăzut de legislația aplicabilă privind protecția consumatorului după
+              începerea furnizării serviciului digital.
             </li>
           </ul>
           <p className="mt-2">
-            This includes, but is not limited to, rights granted under European Union consumer protection legislation
-            concerning digital content.
+            Acest lucru include, fără a se limita la, drepturile acordate de legislația Uniunii Europene privind
+            protecția consumatorilor în materia conținutului digital.
           </p>
           <hr className="border-dark-50 my-4" />
 
-          <h3 className="text-xl font-semibold text-white mt-4 mb-2">4.5 Price Changes</h3>
-          <p>We reserve the right to modify subscription prices.</p>
+          <h3 className="text-xl font-semibold text-white mt-4 mb-2">4.5 Modificări de preț</h3>
+          <p>Ne rezervăm dreptul de a modifica prețurile abonamentelor.</p>
           <p className="mt-2">
-            Any price changes will be communicated in advance and will apply to future billing cycles only.
+            Orice modificare de preț va fi comunicată în avans și se va aplica numai ciclurilor de facturare viitoare.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">5. ACCEPTABLE USE</h2>
-          <p>You agree not to:</p>
+          <h2 className="text-2xl font-semibold text-white mb-3">5. UTILIZARE ACCEPTABILĂ</h2>
+          <p>Te obligi să nu:</p>
           <ul className="list-disc pl-6 mt-2 space-y-1">
-            <li>Use the platform for unlawful purposes</li>
-            <li>Copy, resell, distribute, or reverse-engineer the service</li>
-            <li>Attempt unauthorized access to the system</li>
-            <li>Use automated tools (bots, scraping software) without permission</li>
-            <li>Disrupt the platform’s operation</li>
+            <li>folosești platforma în scopuri ilegale;</li>
+            <li>copiezi, revinzi, distribui sau decompilezi serviciul;</li>
+            <li>încerci să obții acces neautorizat la sistem;</li>
+            <li>folosești instrumente automate (boți, software de scraping) fără permisiune;</li>
+            <li>perturbi funcționarea platformei.</li>
           </ul>
-          <p className="mt-3">We reserve the right to suspend or terminate accounts that violate these Terms.</p>
+          <p className="mt-3">Ne rezervăm dreptul de a suspenda sau închide conturile care încalcă acești Termeni.</p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">6. INTELLECTUAL PROPERTY</h2>
+          <h2 className="text-2xl font-semibold text-white mb-3">6. PROPRIETATE INTELECTUALĂ</h2>
           <p>
-            All rights, title, and interest in TrainerOS, including software, design, content structure, branding, and
-            features, remain the exclusive property of SWEVEN S.R.L.
+            Toate drepturile, titlul și interesele asupra TrainerOS, inclusiv software-ul, designul, structura
+            conținutului, brandingul și funcționalitățile, rămân proprietatea exclusivă a SWEVEN S.R.L.
           </p>
-          <p className="mt-3">Users are granted a limited, non-exclusive, non-transferable license to use the service.</p>
+          <p className="mt-3">Utilizatorilor li se acordă o licență limitată, neexclusivă și netransferabilă pentru utilizarea serviciului.</p>
           <p className="mt-3">
-            You may not copy, reproduce, modify, or redistribute any part of the platform without written permission.
+            Nu poți copia, reproduce, modifica sau redistribui nicio parte a platformei fără acord scris prealabil.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">7. USER CONTENT</h2>
-          <p>You retain ownership of any content you upload to the platform.</p>
+          <h2 className="text-2xl font-semibold text-white mb-3">7. CONȚINUTUL UTILIZATORULUI</h2>
+          <p>Păstrezi dreptul de proprietate asupra oricărui conținut pe care îl încarci pe platformă.</p>
           <p className="mt-3">
-            By using TrainerOS, you grant us a limited license to process and store that content solely for the purpose
-            of providing the service.
+            Prin utilizarea TrainerOS, ne acorzi o licență limitată pentru procesarea și stocarea acelui conținut
+            exclusiv în scopul furnizării serviciului.
           </p>
-          <p className="mt-3">We do not claim ownership of your content.</p>
+          <p className="mt-3">Nu revendicăm dreptul de proprietate asupra conținutului tău.</p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">8. LIMITATION OF LIABILITY</h2>
-          <p>TrainerOS is provided “as is” and “as available”.</p>
-          <p className="mt-3">We do not guarantee:</p>
+          <h2 className="text-2xl font-semibold text-white mb-3">8. LIMITAREA RĂSPUNDERII</h2>
+          <p>TrainerOS este furnizat „ca atare” și „în funcție de disponibilitate”.</p>
+          <p className="mt-3">Nu garantăm:</p>
           <ul className="list-disc pl-6 mt-2 space-y-1">
-            <li>Continuous, uninterrupted, or error-free operation</li>
-            <li>Specific business or financial results</li>
-            <li>That the service will meet all user expectations</li>
+            <li>funcționare continuă, neîntreruptă sau fără erori;</li>
+            <li>rezultate specifice de business sau financiare;</li>
+            <li>că serviciul va îndeplini toate așteptările utilizatorilor.</li>
           </ul>
-          <p className="mt-3">To the maximum extent permitted by law, SWEVEN S.R.L. shall not be liable for:</p>
+          <p className="mt-3">În limita maximă permisă de lege, SWEVEN S.R.L. nu va răspunde pentru:</p>
           <ul className="list-disc pl-6 mt-2 space-y-1">
-            <li>Indirect or consequential damages</li>
-            <li>Loss of profits</li>
-            <li>Loss of data</li>
-            <li>Business interruption</li>
+            <li>daune indirecte sau consecințiale;</li>
+            <li>pierderi de profit;</li>
+            <li>pierderi de date;</li>
+            <li>întreruperea activității.</li>
           </ul>
-          <p className="mt-3">Our total liability shall not exceed the total amount paid by you in the previous 12 months.</p>
+          <p className="mt-3">Răspunderea noastră totală nu va depăși suma totală plătită de tine în ultimele 12 luni.</p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">9. TERMINATION</h2>
-          <p>We may suspend or terminate your account if:</p>
+          <h2 className="text-2xl font-semibold text-white mb-3">9. ÎNCETAREA</h2>
+          <p>Putem suspenda sau închide contul tău dacă:</p>
           <ul className="list-disc pl-6 mt-2 space-y-1">
-            <li>You breach these Terms</li>
-            <li>You fail to pay subscription fees</li>
-            <li>Your use threatens the security or integrity of the platform</li>
+            <li>încalci acești Termeni;</li>
+            <li>nu plătești taxele de abonament;</li>
+            <li>modul tău de utilizare amenință securitatea sau integritatea platformei.</li>
           </ul>
-          <p className="mt-3">Upon termination, access to your account and stored data may be permanently deleted.</p>
+          <p className="mt-3">La încetare, accesul la contul tău și la datele stocate poate fi șters definitiv.</p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">10. DATA PROTECTION</h2>
-          <p>
-            Personal data is processed in accordance with our Privacy Policy.
-          </p>
-          <p className="mt-3">By using TrainerOS, you confirm that you have read and accepted our Privacy Policy.</p>
+          <h2 className="text-2xl font-semibold text-white mb-3">10. PROTECȚIA DATELOR</h2>
+          <p>Datele cu caracter personal sunt prelucrate în conformitate cu Politica noastră de Confidențialitate.</p>
+          <p className="mt-3">Prin utilizarea TrainerOS, confirmi că ai citit și ai acceptat Politica noastră de Confidențialitate.</p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">11. MODIFICATIONS</h2>
-          <p>
-            We reserve the right to modify these Terms at any time.
-          </p>
+          <h2 className="text-2xl font-semibold text-white mb-3">11. MODIFICĂRI</h2>
+          <p>Ne rezervăm dreptul de a modifica acești Termeni în orice moment.</p>
           <p className="mt-3">
-            Updated versions will be published on the website. Continued use of the service constitutes acceptance of
-            the updated Terms.
+            Versiunile actualizate vor fi publicate pe website. Continuarea utilizării serviciului constituie acceptarea
+            Termenilor actualizați.
           </p>
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">12. GOVERNING LAW</h2>
-          <p>These Terms are governed by the laws of Romania.</p>
+          <h2 className="text-2xl font-semibold text-white mb-3">12. LEGEA APLICABILĂ</h2>
+          <p>Acești Termeni sunt guvernați de legislația din România.</p>
           <p className="mt-3">
-            Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the Romanian
-            courts.
+            Orice litigiu apărut în legătură cu acești Termeni va fi supus jurisdicției exclusive a instanțelor din România.
           </p>
         </section>
 
         <section>
           <h2 className="text-2xl font-semibold text-white mb-3">13. CONTACT</h2>
-          <p>For questions regarding these Terms:</p>
+          <p>Pentru întrebări legate de acești Termeni:</p>
           <p className="mt-3">
             Email:{' '}
             <a href="mailto:business@traineros.org" className="text-brand-500">
               business@traineros.org
             </a>
             <br />
-            Registered Office: Str. Principală, Moisei, Maramureș, Romania
+            Sediu social: Str. Principală, Moisei, Maramureș, România
           </p>
         </section>
       </div>
 
       <p className="text-gray-300 leading-relaxed mt-10">
-        By using TrainerOS, you acknowledge that you have read, understood, and agree to these Terms and Conditions.
+        Prin utilizarea TrainerOS, confirmi că ai citit, ai înțeles și ești de acord cu acești Termeni și Condiții.
       </p>
     </div>
   );

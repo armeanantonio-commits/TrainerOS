@@ -10,17 +10,17 @@ const appFeatures = [
   },
   {
     icon: '🎯',
-    title: 'Niche Finder (Quick + Discover)',
+    title: 'Niche Finder (Rapid + Descoperă)',
     description: 'Găsești nișa, clientul ideal și poziționarea prin flux rapid sau ghidat.',
   },
   {
     icon: '🗣️',
-    title: 'Brand Voice Setup',
-    description: 'Definiți tonul, stilul și principiile ca ideile generate să sune ca tine.',
+    title: 'Setare Brand Voice',
+    description: 'Definești tonul, stilul și principiile ca ideile generate să sune ca tine.',
   },
   {
     icon: '🎬',
-    title: 'Content Creation Preferences',
+    title: 'Preferințe de creare content',
     description: 'Setezi cum filmezi natural și ce format ți se potrivește pentru idei mai realiste.',
   },
   {
@@ -45,7 +45,7 @@ const appFeatures = [
   },
   {
     icon: '🤖',
-    title: 'TrainerOS Chat (Marketing Expert)',
+    title: 'TrainerOS Chat (Expert Marketing)',
     description: 'Asistent AI în timp real pentru hook-uri, CTA, oferte și strategii de content fitness.',
   },
   {
@@ -65,11 +65,11 @@ export default function Home() {
         <div className="absolute -top-10 left-[8%] h-56 w-56 rounded-full border border-cyan-300/25 animate-float-slow" />
         <div className="absolute top-16 right-[8%] h-40 w-40 rounded-full border border-cyan-200/20 animate-float-delay" />
         <div className="console-panel absolute bottom-10 left-[8%] hidden rounded-[22px] px-4 py-3 md:block animate-float-delay">
-          <p className="console-kicker">Content Rep Counter</p>
+          <p className="console-kicker">Contor consistență content</p>
           <p className="text-white text-lg font-bold">7 zile streak</p>
         </div>
         <div className="console-panel absolute right-[8%] top-24 hidden rounded-[22px] px-4 py-3 lg:block animate-float-slow">
-          <p className="console-kicker">AI Output Flow</p>
+          <p className="console-kicker">Flux output AI</p>
           <p className="text-white text-sm">HOOK → SCRIPT → CTA</p>
         </div>
         <div className="console-panel-strong relative mx-auto max-w-7xl rounded-[38px] px-4 py-20 sm:px-6 lg:px-8">
@@ -106,7 +106,7 @@ export default function Home() {
           <div className="flex justify-center mb-8">
             <Link to="/register">
               <Button size="lg" className="text-xl px-12 py-5">
-                Start Free Trial →
+                Începe Free Trial →
               </Button>
             </Link>
           </div>
@@ -133,7 +133,7 @@ export default function Home() {
       {/* Features Preview Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-16">
-          <p className="console-kicker mb-3">Platform Modules</p>
+          <p className="console-kicker mb-3">Module platformă</p>
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 font-display">
             Funcționalități în TrainerOS
           </h2>
@@ -326,7 +326,7 @@ export default function Home() {
                 Primești rapid un plan practic, clar și ușor de implementat în rutina clientului.
               </p>
               <div className="inline-block mt-4">
-                <Button variant="outline" disabled>Upcoming Feature</Button>
+                <Button variant="outline" disabled>Funcție viitoare</Button>
               </div>
             </div>
           </div>
@@ -336,7 +336,7 @@ export default function Home() {
       {/* Pricing Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-12">
-          <p className="console-kicker mb-3">Pricing Console</p>
+          <p className="console-kicker mb-3">Consolă prețuri</p>
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 font-display">
             Prețuri simple, <span className="text-cyan-200">transparente</span>
           </h2>
@@ -367,7 +367,7 @@ export default function Home() {
                 {[
                   'Daily Idea: 100 seturi/lună',
                   'Structurează Ideea: 90/lună',
-                  'Mail Marketing: 60/lună',
+                  'Email Marketing: 60/lună',
                   'Nutriție Client: 10/lună',
                   'Chat TrainerOS: 300 întrebări/lună',
                   'Content Review: 60/lună',
@@ -403,7 +403,7 @@ export default function Home() {
                 {[
                   'Daily Idea: 400 seturi/lună',
                   'Structurează Ideea: 450/lună',
-                  'Mail Marketing: 150/lună',
+                  'Email Marketing: 150/lună',
                   'Nutriție Client: 30/lună',
                   'Chat TrainerOS: 900 întrebări/lună',
                   'Content Review: nelimitat',
@@ -432,7 +432,7 @@ export default function Home() {
       {/* Final CTA Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="console-panel-strong rounded-[36px] p-8 sm:p-12 text-center">
-          <p className="console-kicker mb-3">Deploy Content Engine</p>
+          <p className="console-kicker mb-3">Activează motorul de content</p>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 font-display">
             Gata să transformi content-ul în clienți?
           </h2>
@@ -441,7 +441,7 @@ export default function Home() {
           </p>
           <Link to="/register">
             <Button variant="primary" size="lg">
-              Start Free Trial →
+              Începe Free Trial →
             </Button>
           </Link>
         </div>

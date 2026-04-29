@@ -6,6 +6,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  preferredLanguage?: 'ro' | 'en';
   niche?: string | null;
   icpProfile?: unknown;
   positioningMessage?: string | null;

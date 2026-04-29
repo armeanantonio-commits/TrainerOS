@@ -12,7 +12,7 @@ const featureCards = [
     title: 'Structurează Ideea',
     description: 'Tu vii cu ideea, AI-ul o dezvoltă în hook, script și CTA.',
   },
-  { icon: '📧', title: 'Email Marketing', description: 'Scrii mailuri care duc spre acțiune.' },
+  { icon: '📧', title: 'Email Marketing', description: 'Scrii emailuri care duc spre acțiune.' },
   { icon: '🤖', title: 'TrainerOS Chat', description: 'Primești răspunsuri rapide pe marketing.' },
   { icon: '🔥', title: 'Dashboard', description: 'Vezi progresul și ritmul tău.' },
 ];

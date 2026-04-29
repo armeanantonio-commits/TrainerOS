@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import Card from '../components/Card';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { chatAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 type ChatMessage = {
   id: string;
@@ -21,16 +22,25 @@ type ChatMessage = {
   content: string;
 };
 
-const starterMessage: ChatMessage = {
-  id: 'starter',
-  role: 'assistant',
-  content:
-    'Sunt TrainerOS. Te ajut strict cu marketing fitness: ofertă, poziționare, mesaje de vânzare, funnel și content care convertește.',
-};
-
 export default function ChatScreen() {
+  const { language, t } = useI18n();
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([starterMessage]);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'starter',
+      role: 'assistant',
+      content: t('chat.starter'),
+    },
+  ]);
+
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length !== 1 || prev[0].id !== 'starter') {
+        return prev;
+      }
+      return [{ id: 'starter', role: 'assistant', content: t('chat.starter') }];
+    });
+  }, [language]);
 
   const chatHistory = useMemo(
     () =>
@@ -55,7 +65,7 @@ export default function ChatScreen() {
         {
           id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           role: 'assistant',
-          content: responseText?.trim() || 'Nu am primit răspuns. Încearcă din nou.',
+          content: responseText?.trim() || t('chat.emptyResponse'),
         },
       ]);
       setInput('');
@@ -75,8 +85,8 @@ export default function ChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>TrainerOS Chat</Text>
-        <Text style={styles.subtitle}>Asistent AI pentru marketing fitness și content.</Text>
+        <Text style={styles.title}>{t('chat.title')}</Text>
+        <Text style={styles.subtitle}>{t('chat.subtitle')}</Text>
 
         <Card style={styles.chatCard}>
           <FlatList
@@ -102,22 +112,22 @@ export default function ChatScreen() {
           <Text style={styles.errorText}>
             {(sendMutation.error as any)?.response?.data?.message ||
               (sendMutation.error as any)?.response?.data?.error ||
-              'Nu am putut trimite mesajul.'}
+              t('chat.sendError')}
           </Text>
         ) : null}
 
         <Input
-          label="Mesaj"
+          label={t('chat.message')}
           value={input}
           onChangeText={setInput}
-          placeholder="Scrie mesajul tău..."
+          placeholder={t('chat.placeholder')}
           multiline
           numberOfLines={3}
           style={styles.input}
         />
 
         <Button
-          title={sendMutation.isPending ? 'Se trimite...' : 'Trimite'}
+          title={sendMutation.isPending ? t('chat.sending') : t('chat.send')}
           onPress={handleSend}
           loading={sendMutation.isPending}
           disabled={!input.trim()}

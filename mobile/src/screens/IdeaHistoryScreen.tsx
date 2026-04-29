@@ -12,6 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import { colors } from '../constants/colors';
 import Card from '../components/Card';
 import { ideaAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 interface IdeaScene {
   scene?: number;
@@ -44,7 +45,7 @@ const FORMAT_ORDER: Record<string, number> = {
   story: 2,
 };
 
-const getHookText = (idea: IdeaItem) => idea.hook || idea.title || 'Fără hook';
+const getHookText = (idea: IdeaItem, fallback: string) => idea.hook || idea.title || fallback;
 
 const getFirstScriptLine = (idea: IdeaItem) => {
   if (!Array.isArray(idea.script) || idea.script.length === 0) {
@@ -107,6 +108,7 @@ const getPreferredIdeaForGroup = (group: IdeaGroup) => {
 
 export default function IdeaHistoryScreen() {
   const navigation = useNavigation<any>();
+  const { language, t } = useI18n();
 
   const { data, isLoading } = useQuery({
     queryKey: ['idea-history'],
@@ -155,11 +157,14 @@ export default function IdeaHistoryScreen() {
       <Card style={styles.ideaCard}>
         <View style={styles.headerRow}>
           <Text style={styles.ideaDate}>
-            {new Date(item.createdAt).toLocaleDateString()}
+            {new Date(item.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'ro-RO')}
           </Text>
         </View>
         <Text style={styles.ideaTitle}>
-          Set cu {item.ideas.length} format{item.ideas.length > 1 ? 'e' : ''}
+          {t('history.setWithFormats', {
+            count: item.ideas.length,
+            suffix: item.ideas.length > 1 ? (language === 'en' ? 's' : 'e') : '',
+          })}
         </Text>
 
         <View style={styles.formatsRow}>
@@ -174,7 +179,7 @@ export default function IdeaHistoryScreen() {
           <View key={`${item.id}-preview-${idea.id}`} style={styles.previewRow}>
             <Text style={styles.previewFormat}>{(idea.format || 'reel').toUpperCase()}:</Text>
             <Text style={styles.previewText} numberOfLines={1}>
-              {getHookText(idea)}
+              {getHookText(idea, t('history.noHook'))}
             </Text>
           </View>
         ))}
@@ -200,9 +205,9 @@ export default function IdeaHistoryScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No ideas yet</Text>
+            <Text style={styles.emptyText}>{t('history.emptyTitle')}</Text>
             <Text style={styles.emptySubtext}>
-              Generate your first idea from the Daily Idea screen
+              {t('history.emptyText')}
             </Text>
           </View>
         }

@@ -18,15 +18,20 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import { nicheAPI, subscriptionAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
+
+type PreferredLanguage = 'ro' | 'en';
 
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const { user, logout, updateProfile } = useAuth();
+  const { t } = useI18n();
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [editing, setEditing] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const currentLanguage: PreferredLanguage = user?.preferredLanguage === 'en' ? 'en' : 'ro';
   const isExpoGo =
     Constants.executionEnvironment === 'storeClient' || Constants.appOwnership === 'expo';
   const iosExternalCheckoutEnabled =
@@ -54,12 +59,12 @@ export default function SettingsScreen() {
 
       if (url.includes('payment=success')) {
         queryClient.invalidateQueries({ queryKey: ['subscription-status'] }).catch(() => undefined);
-        Alert.alert('Success', 'Subscription payment completed. Your plan is updating now.');
+        Alert.alert(t('settings.saved'), t('settings.subscriptionSuccess'));
         return;
       }
 
       if (url.includes('payment=cancelled')) {
-        Alert.alert('Checkout cancelled', 'The subscription checkout was cancelled.');
+        Alert.alert(t('daily.error'), t('settings.checkoutCancelled'));
       }
     });
 
@@ -71,11 +76,21 @@ export default function SettingsScreen() {
   const updateMutation = useMutation({
     mutationFn: async () => updateProfile({ name, email }),
     onSuccess: () => {
-      Alert.alert('Saved', 'Profile updated successfully.');
+      Alert.alert(t('settings.saved'), t('settings.profileSaved'));
       setEditing(false);
     },
     onError: (error: any) => {
-      Alert.alert('Error', error?.response?.data?.error || 'Failed to update profile');
+      Alert.alert(t('daily.error'), error?.response?.data?.error || t('settings.profileSaveError'));
+    },
+  });
+
+  const languageMutation = useMutation({
+    mutationFn: async (preferredLanguage: PreferredLanguage) => updateProfile({ preferredLanguage }),
+    onSuccess: () => {
+      Alert.alert(t('settings.saved'), t('settings.languageSaved'));
+    },
+    onError: (error: any) => {
+      Alert.alert(t('daily.error'), error?.response?.data?.error || t('settings.languageError'));
     },
   });
 
@@ -85,20 +100,20 @@ export default function SettingsScreen() {
       return data;
     },
     onSuccess: () => {
-      Alert.alert('Succes', 'Nișa a fost resetată cu succes! Poți seta o nișă nouă.');
+      Alert.alert(t('prefs.success'), t('settings.nicheResetSuccess'));
     },
     onError: (error: any) => {
-      Alert.alert('Eroare', error?.response?.data?.error || 'A apărut o eroare la resetare.');
+      Alert.alert(t('daily.error'), error?.response?.data?.error || t('settings.nicheResetError'));
     },
   });
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      t('settings.logout'),
+      t('settings.logoutConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: logout },
+        { text: t('settings.cancel'), style: 'cancel' },
+        { text: t('settings.logout'), style: 'destructive', onPress: logout },
       ]
     );
   };
@@ -113,8 +128,8 @@ export default function SettingsScreen() {
       }
 
       Alert.alert(
-        'Unavailable in this build',
-        'Use a development build or App Store build to preview native in-app purchases.'
+        t('settings.checkoutUnavailableTitle'),
+        t('settings.checkoutUnavailableText')
       );
       return;
     }
@@ -137,21 +152,21 @@ export default function SettingsScreen() {
 
       const checkoutUrl = data?.url as string | undefined;
       if (!checkoutUrl) {
-        throw new Error('Checkout URL was not returned by the server.');
+        throw new Error(t('settings.checkoutUrlMissing'));
       }
 
       const canOpen = await Linking.canOpenURL(checkoutUrl);
       if (!canOpen) {
-        throw new Error('Cannot open Stripe Checkout.');
+        throw new Error(t('settings.checkoutOpenError'));
       }
 
       await Linking.openURL(checkoutUrl);
     } catch (error: any) {
       Alert.alert(
-        'Checkout failed',
+        t('settings.checkoutFailed'),
         error?.response?.data?.error ||
           error?.message ||
-          'Could not start the subscription checkout.'
+          t('settings.checkoutStartError')
       );
     } finally {
       setCheckoutLoading(false);
@@ -160,11 +175,11 @@ export default function SettingsScreen() {
 
   const handleSaveProfile = () => {
     if (!email.trim()) {
-      Alert.alert('Validation', 'Email is required.');
+      Alert.alert(t('settings.validation'), t('settings.emailRequired'));
       return;
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
-      Alert.alert('Validation', 'Invalid email format.');
+      Alert.alert(t('settings.validation'), t('settings.invalidEmail'));
       return;
     }
     updateMutation.mutate();
@@ -172,12 +187,12 @@ export default function SettingsScreen() {
 
   const handleResetNiche = () => {
     Alert.alert(
-      'Reset Niche',
-      'Ești sigur că vrei să resetezi nișa? Toate setările de nișă și Niche Builder vor fi șterse.',
+      t('settings.resetNicheConfirmTitle'),
+      t('settings.resetNicheConfirmText'),
       [
-        { text: 'Anulează', style: 'cancel' },
+        { text: t('settings.cancel'), style: 'cancel' },
         {
-          text: 'Resetează',
+          text: t('settings.resetConfirm'),
           style: 'destructive',
           onPress: () => resetNicheMutation.mutate(),
         },
@@ -188,7 +203,7 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>⚙️ Settings</Text>
+        <Text style={styles.title}>{t('settings.title')}</Text>
       </View>
 
       <Card style={styles.profileCard}>
@@ -202,25 +217,25 @@ export default function SettingsScreen() {
       </Card>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={styles.sectionTitle}>{t('settings.account')}</Text>
         <TouchableOpacity style={styles.menuItem} onPress={() => setEditing((v) => !v)}>
-          <Text style={styles.menuText}>Edit Profile</Text>
+          <Text style={styles.menuText}>{t('settings.editProfile')}</Text>
           <Text style={styles.menuIcon}>›</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.menuItem} onPress={handleSubscription}>
-          <Text style={styles.menuText}>Subscription</Text>
+          <Text style={styles.menuText}>{t('settings.subscription')}</Text>
           <Text style={styles.menuIcon}>›</Text>
         </TouchableOpacity>
       </View>
 
       {editing && (
         <Card style={styles.editCard}>
-          <Text style={styles.editTitle}>Edit Profile</Text>
+          <Text style={styles.editTitle}>{t('settings.editProfileTitle')}</Text>
           <Input
-            label="Name"
+            label={t('settings.name')}
             value={name}
             onChangeText={setName}
-            placeholder="Your name"
+            placeholder={t('settings.namePlaceholder')}
           />
           <Input
             label="Email"
@@ -228,10 +243,10 @@ export default function SettingsScreen() {
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
-            placeholder="your@email.com"
+            placeholder={t('settings.emailPlaceholder')}
           />
           <Button
-            title="Save Profile"
+            title={t('settings.saveProfile')}
             onPress={handleSaveProfile}
             loading={updateMutation.isPending}
           />
@@ -239,7 +254,7 @@ export default function SettingsScreen() {
       )}
 
       <Card style={styles.planCard}>
-        <Text style={styles.planTitle}>Current Plan</Text>
+        <Text style={styles.planTitle}>{t('settings.currentPlan')}</Text>
         <Text style={styles.planValue}>{subscription?.plan || 'FREE_TRIAL'}</Text>
         {Platform.OS === 'ios' && isExpoGo ? (
           <Text style={styles.planHint}>
@@ -251,34 +266,61 @@ export default function SettingsScreen() {
         ) : null}
       </Card>
 
+      <Card style={styles.languageCard}>
+        <Text style={styles.languageTitle}>{t('settings.language')}</Text>
+        <Text style={styles.languageText}>
+          {t('settings.languageText')}
+        </Text>
+        <View style={styles.languageToggle}>
+          {([
+            ['ro', 'Română'],
+            ['en', 'English'],
+          ] as const).map(([value, label]) => {
+            const isActive = currentLanguage === value;
+            return (
+              <TouchableOpacity
+                key={value}
+                style={[styles.languageOption, isActive && styles.languageOptionActive]}
+                onPress={() => languageMutation.mutate(value)}
+                disabled={languageMutation.isPending || isActive}
+              >
+                <Text style={[styles.languageOptionText, isActive && styles.languageOptionTextActive]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Card>
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
+        <Text style={styles.sectionTitle}>{t('settings.preferences')}</Text>
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => navigation.navigate('ContentPreferences')}
         >
-          <Text style={styles.menuText}>Content Preferences</Text>
+          <Text style={styles.menuText}>{t('settings.contentPreferences')}</Text>
           <Text style={styles.menuIcon}>›</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => navigation.navigate('ContentCreationPreferences')}
         >
-          <Text style={styles.menuText}>Content Creation Preferences</Text>
+          <Text style={styles.menuText}>{t('settings.contentCreationPreferences')}</Text>
           <Text style={styles.menuIcon}>›</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => navigation.navigate('Chat')}
         >
-          <Text style={styles.menuText}>TrainerOS Chat</Text>
+          <Text style={styles.menuText}>{t('settings.chat')}</Text>
           <Text style={styles.menuIcon}>›</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => navigation.navigate('EmailMarketing')}
         >
-          <Text style={styles.menuText}>Email Marketing AI</Text>
+          <Text style={styles.menuText}>{t('settings.emailMarketing')}</Text>
           <Text style={styles.menuIcon}>›</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -291,12 +333,10 @@ export default function SettingsScreen() {
       </View>
 
       <Card style={styles.resetCard}>
-        <Text style={styles.resetTitle}>Reset Niche</Text>
-        <Text style={styles.resetText}>
-          Șterge nișa curentă și Niche Builder. Vei putea să le setezi din nou folosind Niche Finder.
-        </Text>
+        <Text style={styles.resetTitle}>{t('settings.resetNicheTitle')}</Text>
+        <Text style={styles.resetText}>{t('settings.resetNicheText')}</Text>
         <Button
-          title={resetNicheMutation.isPending ? 'Se resetează...' : 'Reset Niche'}
+          title={resetNicheMutation.isPending ? t('settings.resettingNiche') : t('settings.resetNiche')}
           onPress={handleResetNiche}
           variant="outline"
           disabled={resetNicheMutation.isPending}
@@ -306,7 +346,7 @@ export default function SettingsScreen() {
       </Card>
 
       <Button
-        title="Logout"
+        title={t('settings.logout')}
         onPress={handleLogout}
         variant="outline"
         style={styles.logoutButton}
@@ -387,6 +427,45 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     color: colors.text.secondary,
+  },
+  languageCard: {
+    marginBottom: 24,
+  },
+  languageTitle: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: colors.text.primary,
+    marginBottom: 8,
+  },
+  languageText: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  languageToggle: {
+    flexDirection: 'row' as const,
+    backgroundColor: colors.dark.bg,
+    borderRadius: 10,
+    padding: 4,
+  },
+  languageOption: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderRadius: 8,
+    paddingVertical: 10,
+  },
+  languageOptionActive: {
+    backgroundColor: colors.brand.primary,
+  },
+  languageOptionText: {
+    color: colors.text.secondary,
+    fontSize: 14,
+    fontWeight: '700' as const,
+  },
+  languageOptionTextActive: {
+    color: colors.text.primary,
   },
   section: {
     marginBottom: 24,

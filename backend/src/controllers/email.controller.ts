@@ -9,6 +9,7 @@ import {
   releaseGenerationLock,
 } from '../lib/generation-lock.js';
 import { generateUniqueResult } from '../lib/generation-history.js';
+import { normalizeLanguage } from '../lib/language.js';
 
 const generateEmailSchema = z.object({
   topic: z.string().min(5).max(300),
@@ -30,6 +31,7 @@ export async function generateEmail(req: Request, res: Response): Promise<void> 
 
     const userSession = req.user;
     const payload = generateEmailSchema.parse(req.body);
+    const language = req.body?.language ? payload.language : normalizeLanguage(userSession.preferredLanguage);
     const generationKey = acquireGenerationLock(userSession.id, 'email-marketing');
     if (!generationKey) {
       res.status(409).json(buildGenerationConflictPayload('email-marketing'));
@@ -89,7 +91,7 @@ export async function generateEmail(req: Request, res: Response): Promise<void> 
           offer: payload.offer,
           audiencePain: payload.audiencePain,
           ctaGoal: payload.ctaGoal,
-          language: payload.language,
+          language,
           generationContext: {
             recentOutputs,
             duplicateAttempt,
@@ -111,7 +113,7 @@ export async function generateEmail(req: Request, res: Response): Promise<void> 
           objective: payload.objective,
           emailType: payload.emailType,
           tone: payload.tone,
-          language: payload.language,
+          language,
         },
       });
 

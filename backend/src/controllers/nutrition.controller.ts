@@ -15,6 +15,7 @@ import {
   releaseGenerationLock,
 } from '../lib/generation-lock.js';
 import { generateUniqueResult } from '../lib/generation-history.js';
+import { normalizeLanguage } from '../lib/language.js';
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const prismaAny = prisma as any;
@@ -226,6 +227,7 @@ export async function generateNutritionPlan(req: Request, res: Response): Promis
     await ensureNutritionAllowance(req);
 
     const payload = generateNutritionSchema.parse(req.body);
+    const language = normalizeLanguage(req.user.preferredLanguage);
     const generationKey = acquireGenerationLock(req.user.id, 'nutrition');
     if (!generationKey) {
       res.status(409).json(buildGenerationConflictPayload('nutrition'));
@@ -239,6 +241,7 @@ export async function generateNutritionPlan(req: Request, res: Response): Promis
         generate: ({ recentOutputs, duplicateAttempt }) =>
           openaiService.generateClientNutritionPlan({
             ...payload,
+            language,
             generationContext: {
               recentOutputs,
               duplicateAttempt,
@@ -282,6 +285,7 @@ export async function generateNutritionReportPdfAndEmail(req: Request, res: Resp
     await ensureNutritionAllowance(req);
 
     const payload = generateNutritionReportSchema.parse(req.body) as GenerateNutritionReportInput;
+    const language = normalizeLanguage(req.user.preferredLanguage);
     const generationKey = acquireGenerationLock(req.user.id, 'nutrition');
     if (!generationKey) {
       res.status(409).json(buildGenerationConflictPayload('nutrition'));
@@ -295,6 +299,7 @@ export async function generateNutritionReportPdfAndEmail(req: Request, res: Resp
         generate: ({ recentOutputs, duplicateAttempt }) =>
           generateNutritionReport({
             ...payload,
+            language,
             generationContext: {
               recentOutputs,
               duplicateAttempt,

@@ -13,8 +13,10 @@ import { colors } from '../constants/colors';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { authAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 export default function ResetPasswordScreen() {
+  const { t } = useI18n();
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -25,13 +27,13 @@ export default function ResetPasswordScreen() {
       return data;
     },
     onSuccess: (data: any) => {
-      Alert.alert('Parolă actualizată', data?.message || 'Parola a fost resetată cu succes.');
+      Alert.alert(t('reset.successTitle'), data?.message || t('reset.successText'));
       setToken('');
       setPassword('');
       setConfirmPassword('');
     },
     onError: (error: any) => {
-      Alert.alert('Eroare', error?.response?.data?.error || 'Nu am putut reseta parola.');
+      Alert.alert(t('daily.error'), error?.response?.data?.error || t('reset.errorText'));
     },
   });
 
@@ -44,36 +46,36 @@ export default function ResetPasswordScreen() {
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Setează parolă nouă</Text>
-        <Text style={styles.subtitle}>Introdu token-ul din email și parola nouă.</Text>
+        <Text style={styles.title}>{t('reset.title')}</Text>
+        <Text style={styles.subtitle}>{t('reset.subtitle')}</Text>
 
         <Input
-          label="Reset token"
+          label={t('reset.token')}
           value={token}
           onChangeText={setToken}
           autoCapitalize="none"
-          placeholder="token"
+          placeholder={t('reset.tokenPlaceholder')}
         />
 
         <Input
-          label="Parolă nouă"
+          label={t('reset.newPassword')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          placeholder="minimum 6 caractere"
+          placeholder={t('reset.newPasswordPlaceholder')}
         />
 
         <Input
-          label="Confirmă parola"
+          label={t('reset.confirmPassword')}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
-          placeholder="repetă parola"
-          error={confirmPassword && confirmPassword !== password ? 'Parolele nu coincid' : undefined}
+          placeholder={t('reset.confirmPasswordPlaceholder')}
+          error={confirmPassword && confirmPassword !== password ? t('reset.passwordMismatch') : undefined}
         />
 
         <Button
-          title="Resetează parola"
+          title={t('reset.submit')}
           onPress={() => mutation.mutate()}
           loading={mutation.isPending}
           disabled={!canSubmit}

@@ -4,10 +4,12 @@ import api from '@/services/api';
 import Button from '@/components/Button';
 import Card from '@/components/Card';
 import ScoreBar from '@/components/ScoreBar';
+import { useI18n } from '@/hooks/useI18n';
 
 export default function FeedbackDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { language, t } = useI18n();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['feedback', id],
@@ -24,8 +26,8 @@ export default function FeedbackDetail() {
         <div className="max-w-4xl mx-auto px-4">
           <Card className="text-center py-12">
             <div className="w-16 h-16 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">Se încarcă analiza...</h3>
-            <p className="text-gray-300">Un moment...</p>
+            <h3 className="text-xl font-bold text-white mb-2">{t('feedback.loading')}</h3>
+            <p className="text-gray-300">{t('ideaDetail.wait')}</p>
           </Card>
         </div>
       </div>
@@ -40,16 +42,16 @@ export default function FeedbackDetail() {
             <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-4xl">⚠️</span>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Analiza nu a fost găsită</h3>
+            <h3 className="text-xl font-bold text-white mb-2">{t('feedback.notFound')}</h3>
             <p className="text-gray-300 mb-6">
-              Această analiză nu mai există sau nu ai acces la ea.
+              {t('feedback.notFoundText')}
             </p>
             <div className="flex gap-3 justify-center">
               <Button onClick={() => navigate(-1)} variant="outline">
-                ← Înapoi
+                ← {t('common.back')}
               </Button>
               <Link to="/content-review">
-                <Button>Analizează Content Nou</Button>
+                <Button>{t('feedback.analyzeNew')}</Button>
               </Link>
             </div>
           </Card>
@@ -64,7 +66,7 @@ export default function FeedbackDetail() {
         {/* Header */}
         <div className="mb-6">
           <Button onClick={() => navigate(-1)} variant="outline" size="sm" className="mb-4">
-            ← Înapoi
+            ← {t('common.back')}
           </Button>
           <Card>
             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -73,9 +75,9 @@ export default function FeedbackDetail() {
                   <span className="text-2xl">📊</span>
                 </div>
                 <div>
-                  <h3 className="text-white font-bold">Analiză Content</h3>
+                  <h3 className="text-white font-bold">{t('feedback.title')}</h3>
                   <p className="text-gray-400 text-sm">
-                    {new Date(data.createdAt).toLocaleDateString('ro-RO', {
+                    {new Date(data.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'ro-RO', {
                       weekday: 'long',
                       day: 'numeric',
                       month: 'long',
@@ -86,7 +88,7 @@ export default function FeedbackDetail() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs bg-dark-200 text-gray-300 px-3 py-1 rounded-full font-medium">
-                  {data.fileType === 'video' ? '🎥 Video' : '🖼️ Imagine'}
+                  {data.fileType === 'video' ? t('feedback.video') : t('feedback.image')}
                 </span>
               </div>
             </div>
@@ -95,15 +97,15 @@ export default function FeedbackDetail() {
 
         {/* File Info */}
         <Card className="mb-6">
-          <h3 className="text-xl font-bold text-white mb-4 font-display">Fișier Analizat</h3>
+          <h3 className="text-xl font-bold text-white mb-4 font-display">{t('feedback.fileAnalyzed')}</h3>
           <div className="space-y-2">
             <div>
-              <span className="text-gray-400">Nume:</span>{' '}
+              <span className="text-gray-400">{t('feedback.name')}</span>{' '}
               <span className="text-white">{data.fileName}</span>
             </div>
             {data.duration && (
               <div>
-                <span className="text-gray-400">Durată:</span>{' '}
+                <span className="text-gray-400">{t('feedback.duration')}</span>{' '}
                 <span className="text-white">{data.duration}s</span>
               </div>
             )}
@@ -115,7 +117,7 @@ export default function FeedbackDetail() {
                   rel="noopener noreferrer"
                   className="text-brand-500 hover:text-brand-400 text-sm"
                 >
-                  📥 Descarcă Fișierul Original
+                  {t('feedback.downloadOriginal')}
                 </a>
               </div>
             )}
@@ -125,30 +127,30 @@ export default function FeedbackDetail() {
         {/* Overall Score */}
         <Card className="mb-6">
           <div className="text-center mb-6">
-            <h3 className="text-gray-300 mb-2">Scor General</h3>
+            <h3 className="text-gray-300 mb-2">{t('feedback.overallScore')}</h3>
             <div className="text-6xl font-bold text-white mb-2">
               {data.overallScore}
               <span className="text-3xl text-gray-400">/100</span>
             </div>
             <p className="text-gray-400">
               {data.overallScore >= 80
-                ? '🎉 Excelent!'
+                ? t('feedback.excellent')
                 : data.overallScore >= 60
-                ? '👍 Bun'
+                ? t('feedback.good')
                 : data.overallScore >= 40
-                ? '⚠️ Poate fi îmbunătățit'
-                : '❌ Necesită îmbunătățiri'}
+                ? t('feedback.canImprove')
+                : t('feedback.needsWork')}
             </p>
           </div>
         </Card>
 
         {/* Score Breakdown */}
         <Card className="mb-6">
-          <h3 className="text-xl font-bold text-white mb-6 font-display">Analiză Detaliată</h3>
+          <h3 className="text-xl font-bold text-white mb-6 font-display">{t('feedback.detailedAnalysis')}</h3>
           <div className="space-y-4">
-            <ScoreBar label="Claritate" score={data.clarityScore} />
-            <ScoreBar label="Relevanță" score={data.relevanceScore} />
-            <ScoreBar label="Încredere" score={data.trustScore} />
+            <ScoreBar label={t('review.clarity')} score={data.clarityScore} />
+            <ScoreBar label={t('review.relevance')} score={data.relevanceScore} />
+            <ScoreBar label={t('review.trust')} score={data.trustScore} />
             <ScoreBar label="CTA" score={data.ctaScore} />
           </div>
         </Card>
@@ -156,7 +158,7 @@ export default function FeedbackDetail() {
         {/* Summary */}
         {data.summary && (
           <Card className="mb-6">
-            <h3 className="text-xl font-bold text-white mb-4 font-display">Rezumat</h3>
+            <h3 className="text-xl font-bold text-white mb-4 font-display">{t('review.summary')}</h3>
             <p className="text-gray-300 leading-relaxed">{data.summary}</p>
           </Card>
         )}
@@ -164,7 +166,7 @@ export default function FeedbackDetail() {
         {/* Suggestions */}
         {data.suggestions && data.suggestions.length > 0 && (
           <Card className="mb-6">
-            <h3 className="text-xl font-bold text-white mb-4 font-display">Sugestii de Îmbunătățire</h3>
+            <h3 className="text-xl font-bold text-white mb-4 font-display">{t('review.suggestions')}</h3>
             <div className="space-y-3">
               {data.suggestions.map((suggestion: any, index: number) => {
                 const bgColor =
@@ -204,7 +206,7 @@ export default function FeedbackDetail() {
         {/* Actions */}
         <div className="flex gap-4 justify-center">
           <Link to="/content-review">
-            <Button variant="outline">📊 Analizează Altul</Button>
+            <Button variant="outline">{t('feedback.analyzeAnother')}</Button>
           </Link>
           <Link to="/dashboard">
             <Button variant="outline">🏠 Dashboard</Button>

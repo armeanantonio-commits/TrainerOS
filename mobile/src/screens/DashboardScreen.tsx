@@ -17,6 +17,7 @@ import { colors } from '../constants/colors';
 import Button from '../components/Button';
 import ScreenShell from '../components/ScreenShell';
 import { statsAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 const logoSource = require('../../assets/icon-from-frontend.png');
 
@@ -69,6 +70,7 @@ export default function DashboardScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { t } = useI18n();
 
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
@@ -120,23 +122,25 @@ export default function DashboardScreen() {
               onPress={() => navigation.navigate('Settings' as never)}
               style={({ pressed }) => [styles.topBarButton, pressed && styles.topBarButtonPressed]}
             >
-              <Text style={styles.topBarButtonText}>Setări</Text>
+              <Text style={styles.topBarButtonText}>{t('dashboard.settings')}</Text>
             </Pressable>
           </View>
           <View style={styles.headerTopRow}>
             <View style={styles.headerTextWrap}>
-              <Text style={styles.headerBadgeText}>Workspace Overview</Text>
-              <Text style={styles.welcomeText}>Bine ai venit, {user?.name || 'Antrenor'}</Text>
+              <Text style={styles.headerBadgeText}>{t('dashboard.workspaceOverview')}</Text>
+              <Text style={styles.welcomeText}>
+                {t('dashboard.welcome', { name: user?.name || t('dashboard.coachFallback') })}
+              </Text>
               <Text style={styles.subtitle}>
                 {profile?.niche
-                  ? 'Toate uneltele tale sunt pregătite pentru un workflow clar și rapid.'
-                  : 'Organizează fluxul tău zilnic de content ca un sistem premium.'}
+                  ? t('dashboard.readySubtitle')
+                  : t('dashboard.defaultSubtitle')}
               </Text>
             </View>
           </View>
           {profile?.niche ? (
             <View style={styles.nicheChip}>
-              <Text style={styles.nicheLabel}>Nișa ta</Text>
+              <Text style={styles.nicheLabel}>{t('dashboard.yourNiche')}</Text>
               <View style={styles.nicheRow}>
                 <Text style={styles.nicheValue}>{profile.niche}</Text>
                 <Pressable
@@ -146,7 +150,7 @@ export default function DashboardScreen() {
                     pressed && styles.nicheEditButtonPressed,
                   ]}
                 >
-                  <Text style={styles.nicheEditText}>Editează</Text>
+                  <Text style={styles.nicheEditText}>{t('dashboard.edit')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -155,125 +159,125 @@ export default function DashboardScreen() {
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statKicker}>Idei generate</Text>
+            <Text style={styles.statKicker}>{t('dashboard.generatedIdeas')}</Text>
             <Text style={styles.statValue}>{stats?.totalIdeas || 0}</Text>
-            <Text style={styles.statMeta}>{`${stats?.ideasThisMonth || 0} luna aceasta`}</Text>
+            <Text style={styles.statMeta}>{`${stats?.ideasThisMonth || 0} ${t('dashboard.thisMonth')}`}</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statKicker}>Content analizat</Text>
+            <Text style={styles.statKicker}>{t('dashboard.contentAnalyzed')}</Text>
             <Text style={styles.statValue}>{stats?.totalFeedbacks || 0}</Text>
-            <Text style={styles.statMeta}>{`${stats?.feedbacksThisMonth || 0} luna aceasta`}</Text>
+            <Text style={styles.statMeta}>{`${stats?.feedbacksThisMonth || 0} ${t('dashboard.thisMonth')}`}</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statKicker}>Streak zilnic</Text>
+            <Text style={styles.statKicker}>{t('dashboard.dailyStreak')}</Text>
             <Text style={styles.statValue}>{`${stats?.streak || 0} 🔥`}</Text>
-            <Text style={styles.statMeta}>zile consecutive active</Text>
+            <Text style={styles.statMeta}>{t('dashboard.activeDays')}</Text>
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Daily Workflow</Text>
           <ToolCard
-            title="Daily Idea"
-            description="Generează ideea zilnică de content."
+            title={t('nav.dailyIdeaTitle')}
+            description={t('dashboard.dailyIdeaDesc')}
             emoji="💡"
             meta={
               stats?.ideasThisWeek && stats.ideasThisWeek > 0
-                ? `${stats.ideasThisWeek} generate săptămâna aceasta`
+                ? t('dashboard.generatedThisWeek', { count: stats.ideasThisWeek })
                 : undefined
             }
-            ctaLabel="Deschide Daily Idea"
+            ctaLabel={t('dashboard.openDailyIdea')}
             onPress={() => navigation.navigate('DailyIdea' as never)}
             accent="mint"
           />
           <ToolCard
-            title="Content Review"
-            description="Analizează postările tale."
+            title={t('nav.review')}
+            description={t('dashboard.contentReviewDesc')}
             emoji="📊"
             meta={
               stats?.avgOverallScore && stats.avgOverallScore > 0
-                ? `Scor mediu: ${stats.avgOverallScore}/100`
+                ? t('dashboard.averageScore', { score: stats.avgOverallScore })
                 : undefined
             }
-            ctaLabel="Deschide Content Review"
+            ctaLabel={t('dashboard.openContentReview')}
             onPress={() => navigation.navigate('ContentReview' as never)}
           />
           <ToolCard
-            title="Structurează Ideea"
-            description="Pui ideea brută, iar AI-ul o transformă în Hook → Script → CTA."
+            title={t('dashboard.structurerTitle')}
+            description={t('dashboard.structurerDesc')}
             emoji="🧠"
-            meta="Nou"
-            ctaLabel="Deschide Structurer"
+            meta={t('dashboard.new')}
+            ctaLabel={t('dashboard.openStructurer')}
             onPress={() => navigation.navigate('IdeaStructurer' as never)}
             accent="blue"
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Strategie</Text>
+          <Text style={styles.sectionTitle}>{t('dashboard.strategy')}</Text>
           <ToolCard
-            title="Niche Finder"
-            description="Clarifică-ți nișa și, opțional, clientul ideal."
+            title={t('nav.nicheFinder')}
+            description={t('dashboard.nicheFinderDesc')}
             emoji="🎯"
-            meta={hasNicheSetup ? '✓ Profil completat' : '⚠️ Profil nesetat'}
-            ctaLabel="Deschide Niche Finder"
+            meta={hasNicheSetup ? t('dashboard.profileComplete') : t('dashboard.profileMissing')}
+            ctaLabel={t('dashboard.openNicheFinder')}
             onPress={() => navigation.navigate('NicheFinder' as never)}
             accent="cyan"
           />
           <ToolCard
-            title="Brand Voice"
-            description="Setează tonul tău, stilul și CTA-ul pe care le folosești constant."
+            title={t('nav.brandVoice')}
+            description={t('dashboard.brandVoiceDesc')}
             emoji="🗣️"
-            meta={hasContentPreferences ? '✓ Brand Voice setat' : '⚠️ Brand Voice nesetat'}
-            ctaLabel="Deschide Brand Voice"
+            meta={hasContentPreferences ? t('dashboard.brandVoiceSet') : t('dashboard.brandVoiceMissing')}
+            ctaLabel={t('dashboard.openBrandVoice')}
             onPress={() => navigation.navigate('ContentPreferences' as never)}
           />
           <ToolCard
-            title="Cum vrei să creezi content?"
-            description="Setează stilul tău de filmare și formatul natural de livrare."
+            title={t('dashboard.contentCreationTitle')}
+            description={t('dashboard.contentCreationDesc')}
             emoji="🎬"
             meta={
               hasContentCreationPreferences
-                ? '✓ Preferințe de creare setate'
-                : '⚠️ Preferințe nesetate'
+                ? t('dashboard.contentCreationSet')
+                : t('dashboard.contentCreationMissing')
             }
-            ctaLabel="Deschide Preferințele"
+            ctaLabel={t('dashboard.openPreferences')}
             onPress={() => navigation.navigate('ContentCreationPreferences' as never)}
             accent="cyan"
           />
           <ToolCard
-            title="Spune-mi Nișa Ta"
-            description="Răspunde rapid la întrebări și salvează context util direct în profil."
+            title={t('nav.nicheQuick')}
+            description={t('dashboard.nicheQuickDesc')}
             emoji="🧭"
-            ctaLabel="Deschide Niche Quick"
+            ctaLabel={t('dashboard.openNicheQuick')}
             onPress={() => navigation.navigate('NicheQuick' as never)}
           />
           <ToolCard
-            title="Descoperă Nișa Ta"
-            description="Parcurgi ghidul complet în 3 faze pentru a rafina nișa împreună cu AI-ul."
+            title={t('nav.nicheDiscover')}
+            description={t('dashboard.nicheDiscoverDesc')}
             emoji="🔎"
-            ctaLabel="Deschide Niche Discover"
+            ctaLabel={t('dashboard.openNicheDiscover')}
             onPress={() => navigation.navigate('NicheDiscover' as never)}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Comunicare & Livrare</Text>
+          <Text style={styles.sectionTitle}>{t('dashboard.communication')}</Text>
           <ToolCard
-            title="TrainerOS Chat"
-            description="Expertul tău de marketing pentru antrenori. Primești răspunsuri și strategie pentru content, ofertă și marketing."
+            title={t('nav.chat')}
+            description={t('dashboard.chatDesc')}
             emoji="🤖"
             onPress={() => navigation.navigate('Chat' as never)}
-            ctaLabel="Deschide Chat"
-            meta="Live Streaming"
+            ctaLabel={t('dashboard.openChat')}
+            meta={t('dashboard.liveStreaming')}
           />
           <ToolCard
-            title="Email Marketing AI"
-            description="Generezi emailuri de nurture și sales pe baza contextului tău global (nișă, ICP, poziționare și ofertă)."
+            title={t('nav.emailMarketing')}
+            description={t('dashboard.emailDesc')}
             emoji="📧"
             onPress={() => navigation.navigate('EmailMarketing' as never)}
-            ctaLabel="Deschide Email AI"
-            meta="Nou"
+            ctaLabel={t('dashboard.openEmail')}
+            meta={t('dashboard.new')}
             accent="blue"
           />
           <ToolCard
@@ -288,26 +292,26 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Management</Text>
+          <Text style={styles.sectionTitle}>{t('dashboard.management')}</Text>
           <ToolCard
-            title="Istoric Idei"
-            description="Revizuiește toate ideile generate anterior."
+            title={t('dashboard.ideaHistoryTitle')}
+            description={t('dashboard.ideaHistoryDesc')}
             emoji="📚"
-            ctaLabel="Vezi Istoric Idei"
+            ctaLabel={t('dashboard.viewIdeaHistory')}
             onPress={() => navigation.navigate('IdeaHistory' as never)}
           />
           <ToolCard
-            title="Review History"
-            description="Accesează feedback-ul din analizele video anterioare."
+            title={t('dashboard.reviewHistoryTitle')}
+            description={t('dashboard.reviewHistoryDesc')}
             emoji="📝"
-            ctaLabel="Vezi Review History"
+            ctaLabel={t('dashboard.viewReviewHistory')}
             onPress={() => navigation.navigate('FeedbackHistory' as never)}
           />
           <ToolCard
-            title="Setări"
-            description="Gestionează contul și preferințele aplicației."
+            title={t('dashboard.settings')}
+            description={t('dashboard.settingsDesc')}
             emoji="⚙️"
-            ctaLabel="Deschide Setările"
+            ctaLabel={t('dashboard.openSettings')}
             onPress={() => navigation.navigate('Settings' as never)}
           />
         </View>

@@ -6,6 +6,7 @@ import Button from '@/components/Button';
 import Card from '@/components/Card';
 import Input from '@/components/Input';
 import { useAuth } from '@/contexts/AuthContext';
+import { useI18n } from '@/hooks/useI18n';
 
 type Mode = 'select' | 'quick' | 'wizard' | 'preset';
 
@@ -43,6 +44,7 @@ export default function NicheFinder() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
+  const { t } = useI18n();
 
   const quickMutation = useMutation({
     mutationFn: (query: string) => nicheAPI.generateQuick({ query, saveToProfile: true }),
@@ -136,32 +138,32 @@ export default function NicheFinder() {
   const wizardQuestions = [
     {
       step: 1,
-      question: 'Cu cine îți place cel mai mult să lucrezi?',
-      placeholder: 'Ex: Mame după sarcină care vor să slăbească',
+      question: t('niche.wizard.q1'),
+      placeholder: t('niche.wizard.p1'),
       field: 'targetAudience' as keyof WizardAnswers,
     },
     {
       step: 2,
-      question: 'Ce problemă rezolvi cel mai bine?',
-      placeholder: 'Ex: Lipsa de energie și kilograme în plus după naștere',
+      question: t('niche.wizard.q2'),
+      placeholder: t('niche.wizard.p2'),
       field: 'problemSolved' as keyof WizardAnswers,
     },
     {
       step: 3,
-      question: 'Ce rezultate poți demonstra?',
-      placeholder: 'Ex: -10kg în 12 săptămâni fără diete extreme',
+      question: t('niche.wizard.q3'),
+      placeholder: t('niche.wizard.p3'),
       field: 'results' as keyof WizardAnswers,
     },
     {
       step: 4,
-      question: 'Ce tip de client vrei să eviți?',
-      placeholder: 'Ex: Persoane care caută rezultate instant fără efort',
+      question: t('niche.wizard.q4'),
+      placeholder: t('niche.wizard.p4'),
       field: 'clientType' as keyof WizardAnswers,
     },
     {
       step: 5,
-      question: 'De ce te-ar alege pe tine și nu pe alt antrenor?',
-      placeholder: 'Ex: Program personalizat care se adaptează stilului de viață de mamă',
+      question: t('niche.wizard.q5'),
+      placeholder: t('niche.wizard.p5'),
       field: 'uniquePosition' as keyof WizardAnswers,
     },
   ];
@@ -174,14 +176,13 @@ export default function NicheFinder() {
             <div className="console-orb left-[-4rem] top-[-3rem] h-32 w-32 bg-cyan-300/18 animate-float-slow" />
             <div className="console-orb right-[-2rem] top-8 h-24 w-24 bg-emerald-300/18 animate-float-delay" />
             <div className="mb-6 flex flex-wrap items-center gap-3">
-              <span className="console-badge">Niche Finder + Niche Builder</span>
+              <span className="console-badge">{t('niche.badge')}</span>
             </div>
             <h1 className="mt-2 mb-4 text-4xl font-bold text-white font-display sm:text-5xl">
-              Fără nișă clară, <span className="bg-gradient-to-r from-[#8CF8D4] to-[#72CAFF] bg-clip-text text-transparent">postezi degeaba.</span>
+              {t('niche.heroTitle')} <span className="bg-gradient-to-r from-[#8CF8D4] to-[#72CAFF] bg-clip-text text-transparent">{t('niche.heroHighlight')}</span>
             </h1>
             <p className="text-lg text-slate-300/78 max-w-2xl">
-              Află exact cui te adresezi, ce problemă rezolvi și cum te poziționezi — în mai puțin
-              de 5 minute.
+              {t('niche.heroText')}
             </p>
           </div>
 
@@ -192,22 +193,19 @@ export default function NicheFinder() {
               </div>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-2xl font-bold text-white font-display">
-                "Știu deja nișa mea"
+                {t('niche.quickTitle')}
                 </h2>
               </div>
               <p className="mb-6 text-slate-300/78">
-                Răspunde la 10 întrebări despre clientul tău ideal — AI-ul va crea Niche Builder-ul detaliat și nișa ta.
+                {t('niche.quickText')}
               </p>
               <div className="console-option mb-4 p-4">
-                <p className="text-xs text-slate-300/72">
-                  ✓ Demografic (gen, vârstă)<br />
-                  ✓ Rutina zilnică completă<br />
-                  ✓ Module condiționale personalizate<br />
-                  ✓ Niche Builder ultra-detaliat generat de AI
+                <p className="whitespace-pre-line text-xs text-slate-300/72">
+                  {t('niche.quickFeatures')}
                 </p>
               </div>
               <Button variant="primary" className="w-full">
-                Spune-mi Nișa Ta →
+                {t('niche.quickButton')}
               </Button>
             </Card>
 
@@ -217,22 +215,19 @@ export default function NicheFinder() {
               </div>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-2xl font-bold text-white font-display">
-                "Descoperă Nișa Ta"
+                {t('niche.discoverTitle')}
                 </h2>
               </div>
               <p className="mb-6 text-slate-300/78">
-                Ghid complet în 3 faze: AI-ul propune 3 variante de nișă, tu alegi una, apoi rafinăm împreună pentru rezultate maxime.
+                {t('niche.discoverText')}
               </p>
               <div className="console-option mb-4 p-4">
-                <p className="text-xs text-slate-300/72">
-                  ✓ Faza A: 6 întrebări despre experiența ta<br />
-                  ✓ Faza B: AI propune 3 variante de nișă<br />
-                  ✓ Faza C: Rafinare cu 5 întrebări detaliate<br />
-                  ✓ Nișă + Niche Builder personalizat final
+                <p className="whitespace-pre-line text-xs text-slate-300/72">
+                  {t('niche.discoverFeatures')}
                 </p>
               </div>
               <Button variant="outline" className="w-full">
-                Află Nișa Ta →
+                {t('niche.discoverButton')}
               </Button>
             </Card>
 
@@ -242,22 +237,19 @@ export default function NicheFinder() {
               </div>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-2xl font-bold text-white font-display">
-                  Alege o nișă prestabilită
+                  {t('niche.presetTitle')}
                 </h2>
               </div>
               <p className="mb-6 text-slate-300/78">
-                Primești 5 nișe fitness generate de AI, în română, gata de ales dintr-un click.
+                {t('niche.presetText')}
               </p>
               <div className="console-option mb-4 p-4">
-                <p className="text-xs text-slate-300/72">
-                  ✓ 5 propuneri generate de AI<br />
-                  ✓ Nișe relevante pentru fitness coach<br />
-                  ✓ Alegi una și o salvăm imediat în profil<br />
-                  ✓ Te ducem direct spre Daily Idea
+                <p className="whitespace-pre-line text-xs text-slate-300/72">
+                  {t('niche.presetFeatures')}
                 </p>
               </div>
               <Button variant="outline" className="w-full" isLoading={presetOptionsMutation.isPending}>
-                Alege Rapid →
+                {t('niche.presetButton')}
               </Button>
             </Card>
           </div>
@@ -271,31 +263,31 @@ export default function NicheFinder() {
       <div className="min-h-screen py-12">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <Button variant="outline" size="sm" onClick={() => setMode('select')} className="mb-6">
-            ← Înapoi
+            ← {t('common.back')}
           </Button>
 
           <div className="console-hero mb-8">
             <div className="mb-6 flex flex-wrap items-center gap-3">
-              <span className="console-badge">Preset Niches</span>
+              <span className="console-badge">{t('niche.presetBadge')}</span>
             </div>
             <h1 className="mt-2 mb-4 text-4xl font-bold text-white font-display sm:text-5xl">
-              Alege o nișă prestabilită și mergi mai departe.
+              {t('niche.presetHeroTitle')}
             </h1>
             <p className="max-w-2xl text-lg text-slate-300/78">
-              AI-ul ți-a pregătit 5 direcții potrivite pentru un fitness coach. Când dai click pe una, o salvăm ca nișa ta.
+              {t('niche.presetHeroText')}
             </p>
           </div>
 
           {presetOptionsMutation.isPending && (
             <Card className="mb-8 text-center">
-              <p className="text-slate-300/78">Se generează cele 5 nișe prestabilite...</p>
+              <p className="text-slate-300/78">{t('niche.presetLoading')}</p>
             </Card>
           )}
 
           {presetOptionsMutation.isError && (
             <Card className="mb-8 border-red-500/40 bg-red-500/10">
               <p className="text-sm text-red-200">
-                Nu am putut genera nișele prestabilite acum. Încearcă din nou.
+                {t('niche.presetError')}
               </p>
             </Card>
           )}
@@ -305,7 +297,7 @@ export default function NicheFinder() {
               <Card key={`${option.niche}-${index}`} className="flex h-full flex-col justify-between">
                 <div>
                   <div className="mb-4 inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-100">
-                    Varianta AI {index + 1}
+                    {t('niche.aiOption', { number: index + 1 })}
                   </div>
                   <h2 className="mb-3 text-2xl font-bold text-white font-display">
                     {option.niche}
@@ -319,7 +311,7 @@ export default function NicheFinder() {
                   isLoading={presetSelectionMutation.isPending && quickQuery === option.niche}
                   onClick={() => handlePresetSelect(option)}
                 >
-                  Alege această nișă →
+                  {t('niche.chooseThis')}
                 </Button>
               </Card>
             ))}
@@ -334,7 +326,7 @@ export default function NicheFinder() {
       <div className="min-h-screen py-12">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <Button variant="outline" size="sm" onClick={() => setMode('select')} className="mb-6">
-            ← Înapoi
+            ← {t('common.back')}
           </Button>
 
           <Card className="console-panel-strong">
@@ -343,22 +335,22 @@ export default function NicheFinder() {
                 <span className="text-3xl">⚡</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white font-display">Quick Mode</h1>
-                <p className="text-gray-300 text-sm">Introdu nișa ta în câteva cuvinte</p>
+                <h1 className="text-2xl font-bold text-white font-display">{t('niche.quickMode')}</h1>
+                <p className="text-gray-300 text-sm">{t('niche.quickModeText')}</p>
               </div>
             </div>
 
             <form onSubmit={handleQuickSubmit} className="space-y-6">
               <Input
-                label="Descrie-ți nișa"
-                placeholder='Ex: "Slăbit pentru mame după sarcină"'
+                label={t('niche.describeNiche')}
+                placeholder={t('niche.describePlaceholder')}
                 value={quickQuery}
                 onChange={(e) => setQuickQuery(e.target.value)}
                 required
               />
 
               <Button type="submit" className="w-full" isLoading={quickMutation.isPending}>
-                Generează Profil →
+                {t('niche.generateProfile')}
               </Button>
             </form>
 
@@ -367,45 +359,45 @@ export default function NicheFinder() {
                 {/* Success Banner */}
                 <div className="mt-6 rounded-[22px] border border-cyan-300/25 bg-cyan-300/12 p-4 text-center">
                   <p className="mb-1 text-lg font-bold text-white">
-                    ✅ Nișa ta a fost salvată cu succes!
+                    {t('niche.saved')}
                   </p>
                   <p className="text-sm text-slate-200">
-                    Redirecting în 3 secunde către Daily Idea...
+                    {t('niche.redirecting')}
                   </p>
                 </div>
 
                 {/* Results */}
                 <div className="mt-6 space-y-4">
                   <div className="rounded-[22px] border border-cyan-300/25 bg-cyan-300/10 p-6">
-                    <h3 className="mb-2 text-sm font-bold uppercase text-console-accent">Nișa Ta</h3>
+                    <h3 className="mb-2 text-sm font-bold uppercase text-console-accent">{t('niche.yourNiche')}</h3>
                     <p className="text-white text-lg">
                       {getResultValue(
                         quickMutation.data.data.niche,
-                        'Nișa nu a fost generată complet.'
+                        t('niche.nicheFallback')
                       )}
                     </p>
                   </div>
 
                   <div className="console-option p-6">
                     <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">
-                      Client Ideal
+                      {t('niche.idealClient')}
                     </h3>
                     <p className="whitespace-pre-line text-white">
                       {getResultValue(
                         quickMutation.data.data.idealClient,
-                        'Clientul ideal nu a fost returnat complet. Reîncearcă generarea pentru profilul complet.'
+                        t('niche.idealClientFallback')
                       )}
                     </p>
                   </div>
 
                   <div className="console-option p-6">
                     <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">
-                      Mesaj de Poziționare
+                      {t('niche.positioning')}
                     </h3>
                     <p className="whitespace-pre-line text-white">
                       {getResultValue(
                         quickMutation.data.data.positioning,
-                        'Mesajul de poziționare nu a fost returnat complet. Reîncearcă generarea.'
+                        t('niche.positioningFallback')
                       )}
                     </p>
                   </div>
@@ -413,10 +405,10 @@ export default function NicheFinder() {
                   {/* Quick Actions */}
                   <div className="flex gap-4 pt-4">
                     <Button onClick={() => navigate('/daily-idea')} className="flex-1">
-                      🚀 Generează Prima Idee
+                      {t('niche.generateFirstIdea')}
                     </Button>
                     <Button onClick={() => navigate('/dashboard')} variant="outline" className="flex-1">
-                      📊 Mergi la Dashboard
+                      {t('niche.goDashboard')}
                     </Button>
                   </div>
                 </div>
@@ -426,7 +418,7 @@ export default function NicheFinder() {
             {quickMutation.isError && (
               <div className="mt-6 bg-red-500/10 border border-red-500 rounded-lg p-4">
                 <p className="text-red-500 text-sm">
-                  A apărut o eroare. Încearcă din nou.
+                  {t('niche.genericError')}
                 </p>
               </div>
             )}
@@ -443,7 +435,7 @@ export default function NicheFinder() {
     <div className="min-h-screen py-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <Button variant="outline" size="sm" onClick={() => setMode('select')} className="mb-6">
-          ← Înapoi
+          ← {t('common.back')}
         </Button>
 
         <Card className="console-panel-strong">
@@ -452,9 +444,9 @@ export default function NicheFinder() {
               <span className="text-3xl">🧭</span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white font-display">Wizard Mode</h1>
+              <h1 className="text-2xl font-bold text-white font-display">{t('niche.wizardMode')}</h1>
               <p className="text-gray-300 text-sm">
-                Întrebare {wizardStep} din 5
+                {t('niche.questionCount', { current: wizardStep, total: 5 })}
               </p>
             </div>
           </div>
@@ -508,7 +500,7 @@ export default function NicheFinder() {
                   isLoading={wizardMutation.isPending}
                   disabled={!wizardAnswers[currentQuestion.field]}
                 >
-                  {wizardStep === 5 ? 'Finalizează →' : 'Continuă →'}
+                  {wizardStep === 5 ? t('niche.finish') : t('niche.continue')}
                 </Button>
               </div>
             </>
@@ -517,43 +509,43 @@ export default function NicheFinder() {
               {/* Success Banner */}
               <div className="mb-6 rounded-[22px] border border-cyan-300/25 bg-cyan-300/12 p-4 text-center">
                 <p className="mb-1 text-lg font-bold text-white">
-                  ✅ Nișa ta a fost salvată cu succes!
+                  {t('niche.saved')}
                 </p>
                 <p className="text-sm text-slate-200">
-                  Redirecting în 3 secunde către Daily Idea...
+                  {t('niche.redirecting')}
                 </p>
               </div>
 
               {/* Results */}
               <div className="space-y-4">
                 <div className="rounded-[22px] border border-cyan-300/25 bg-cyan-300/10 p-6">
-                  <h3 className="mb-2 text-sm font-bold uppercase text-console-accent">Nișa Ta</h3>
+                  <h3 className="mb-2 text-sm font-bold uppercase text-console-accent">{t('niche.yourNiche')}</h3>
                   <p className="text-white text-lg">
                     {getResultValue(
                       wizardMutation.data.data.niche,
-                      'Nișa nu a fost generată complet.'
+                      t('niche.nicheFallback')
                     )}
                   </p>
                 </div>
 
                 <div className="console-option p-6">
-                  <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">Client Ideal</h3>
+                  <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">{t('niche.idealClient')}</h3>
                   <p className="whitespace-pre-line text-white">
                     {getResultValue(
                       wizardMutation.data.data.idealClient,
-                      'Clientul ideal nu a fost returnat complet. Reîncearcă generarea pentru profilul complet.'
+                      t('niche.idealClientFallback')
                     )}
                   </p>
                 </div>
 
                 <div className="console-option p-6">
                   <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">
-                    Mesaj de Poziționare
+                    {t('niche.positioning')}
                   </h3>
                   <p className="whitespace-pre-line text-white">
                     {getResultValue(
                       wizardMutation.data.data.positioning,
-                      'Mesajul de poziționare nu a fost returnat complet. Reîncearcă generarea.'
+                      t('niche.positioningFallback')
                     )}
                   </p>
                 </div>
@@ -561,10 +553,10 @@ export default function NicheFinder() {
                 {/* Quick Actions */}
                 <div className="flex gap-4 pt-4">
                   <Button onClick={() => navigate('/daily-idea')} className="flex-1">
-                    🚀 Generează Prima Idee
+                    {t('niche.generateFirstIdea')}
                   </Button>
                   <Button onClick={() => navigate('/dashboard')} variant="outline" className="flex-1">
-                    📊 Mergi la Dashboard
+                    {t('niche.goDashboard')}
                   </Button>
                 </div>
               </div>

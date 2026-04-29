@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { emailAPI } from '@/services/api';
 import { copyToClipboard } from '@/lib/utils';
+import { useI18n } from '@/hooks/useI18n';
 
 type Objective = 'lead-magnet' | 'nurture' | 'sales' | 'reengagement';
 type EmailType = 'single' | 'welcome' | 'promo' | 'newsletter';
@@ -171,7 +172,7 @@ function FanDropdown<T extends string>({
   );
 }
 
-function OutputIdle() {
+function OutputIdle({ title, text }: { title: string; text: string }) {
   return (
     <div className="flex min-h-[560px] flex-col items-center justify-center py-10 text-center">
       <div className="relative mb-7 h-[250px] w-[260px] animate-[floatInbox_4.8s_ease-in-out_infinite]">
@@ -181,20 +182,21 @@ function OutputIdle() {
         <div className="absolute left-20 top-28 h-2 w-20 rounded-full bg-cyan-200/60" />
         <div className="absolute left-20 top-40 h-2 w-28 rounded-full bg-slate-300/35" />
       </div>
-      <h3 className="text-[22px] font-semibold text-white">Completează brief-ul și apasă Generează.</h3>
+      <h3 className="text-[22px] font-semibold text-white">{title}</h3>
       <p className="mt-2 animate-pulse text-sm leading-6 text-slate-300/80">
-        AI-ul tău e gata.
+        {text}
       </p>
     </div>
   );
 }
 
 export default function EmailMarketing() {
+  const { language: platformLanguage, t } = useI18n();
   const [topic, setTopic] = useState('');
   const [objective, setObjective] = useState<Objective>('nurture');
   const [emailType, setEmailType] = useState<EmailType>('single');
   const [tone, setTone] = useState<Tone>('friendly');
-  const [language, setLanguage] = useState<Language>('ro');
+  const [language, setLanguage] = useState<Language>(platformLanguage);
   const [offer, setOffer] = useState('');
   const [audiencePain, setAudiencePain] = useState('');
   const [ctaGoal, setCtaGoal] = useState('');
@@ -203,17 +205,21 @@ export default function EmailMarketing() {
   const [showFab, setShowFab] = useState(false);
 
   const topicPlaceholder = useTypingPlaceholder([
-    'Ex: De ce mamele după sarcină nu slăbesc deși mănâncă puțin',
-    'Ex: 3 motive pentru care clientele abandonează după primele 2 săptămâni',
+    t('email.placeholder.topic1'),
+    t('email.placeholder.topic2'),
   ]);
   const offerPlaceholder = useTypingPlaceholder([
-    'Ex: Program 12 săptămâni pentru femei ocupate',
-    'Ex: Audit gratuit + plan personalizat de start',
+    t('email.placeholder.offer1'),
+    t('email.placeholder.offer2'),
   ]);
   const painPlaceholder = useTypingPlaceholder([
-    'Ex: lipsă consistență, energie scăzută, vinovăție alimentară',
-    'Ex: nu au timp, nu știu ce să mănânce, renunță repede',
+    t('email.placeholder.pain1'),
+    t('email.placeholder.pain2'),
   ]);
+
+  useEffect(() => {
+    setLanguage(platformLanguage);
+  }, [platformLanguage]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -251,23 +257,23 @@ export default function EmailMarketing() {
     () =>
       result
         ? [
-            { title: 'Subiecte alternative', body: result.subjectOptions.join('\n') },
-            { title: 'Preview Text', body: result.previewText },
-            { title: 'Body Complet', body: result.body },
-            { title: 'CTA', body: result.cta },
-            { title: 'Angles', body: result.angles.join('\n') },
+            { id: 'subjects', title: t('email.subjectOptions'), body: result.subjectOptions.join('\n') },
+            { id: 'preview', title: t('email.previewText'), body: result.previewText },
+            { id: 'body', title: t('email.fullBody'), body: result.body },
+            { id: 'cta', title: 'CTA', body: result.cta },
+            { id: 'angles', title: t('email.angles'), body: result.angles.join('\n') },
           ]
         : [],
-    [result]
+    [result, t]
   );
 
   const handleCopy = async (text: string, label: string) => {
     try {
       await copyToClipboard(text);
-      setCopyStatus(`${label} copiat.`);
+      setCopyStatus(t('email.copied', { label }));
       window.setTimeout(() => setCopyStatus(null), 1500);
     } catch {
-      setCopyStatus('Nu am putut copia textul.');
+      setCopyStatus(t('email.copyError'));
       window.setTimeout(() => setCopyStatus(null), 1500);
     }
   };
@@ -292,7 +298,7 @@ export default function EmailMarketing() {
       result.angles.join('\n'),
     ].join('\n');
 
-    void handleCopy(payload, 'Tot email-ul');
+    void handleCopy(payload, t('email.allEmail'));
   };
 
   const handleSend = () => {
@@ -351,7 +357,7 @@ export default function EmailMarketing() {
           <div className="inline-flex items-center gap-2 rounded-full border border-[#4CC9F044] bg-[#4CC9F018] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-[#7FDBFF]">
             Email Marketing AI
           </div>
-          <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight sm:text-5xl">Consola pentru generare email</h1>
+          <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight sm:text-5xl">{t('email.title')}</h1>
         </div>
 
         <div className="relative grid gap-8 xl:grid-cols-[1.06fr_0.94fr]">
@@ -366,52 +372,52 @@ export default function EmailMarketing() {
 
           <div className="relative overflow-visible rounded-[32px] border border-[#4CC9F055] bg-black/40 p-5 shadow-[0_0_0_1px_rgba(76,201,240,0.08),0_25px_80px_rgba(0,0,0,0.36)] backdrop-blur-xl">
             <SectionHeader
-              title="Email Brief"
+              title={t('email.brief')}
               description=""
             />
 
             <div className="space-y-5">
-              <NeonInput label="Subiect email" value={topic} onChange={setTopic} placeholder={topicPlaceholder || ' '} />
+              <NeonInput label={t('email.topic')} value={topic} onChange={setTopic} placeholder={topicPlaceholder || ' '} />
 
               <div className="grid gap-4 md:grid-cols-2">
                 <FanDropdown
-                  label="Obiectiv"
+                  label={t('email.objective')}
                   value={objective}
                   onChange={setObjective}
                   options={[
-                    { value: 'nurture', label: 'Încălzire lead-uri' },
-                    { value: 'lead-magnet', label: 'Lead magnet' },
-                    { value: 'sales', label: 'Vânzare' },
-                    { value: 'reengagement', label: 'Reactivare' },
+                    { value: 'nurture', label: t('email.objective.nurture') },
+                    { value: 'lead-magnet', label: t('email.objective.leadMagnet') },
+                    { value: 'sales', label: t('email.objective.sales') },
+                    { value: 'reengagement', label: t('email.objective.reengagement') },
                   ]}
                 />
                 <FanDropdown
-                  label="Tip email"
+                  label={t('email.type')}
                   value={emailType}
                   onChange={setEmailType}
                   options={[
-                    { value: 'single', label: 'Email unic' },
-                    { value: 'welcome', label: 'Bun venit' },
-                    { value: 'promo', label: 'Promoțional' },
-                    { value: 'newsletter', label: 'Newsletter' },
+                    { value: 'single', label: t('email.type.single') },
+                    { value: 'welcome', label: t('email.type.welcome') },
+                    { value: 'promo', label: t('email.type.promo') },
+                    { value: 'newsletter', label: t('email.type.newsletter') },
                   ]}
                 />
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <FanDropdown
-                  label="Ton"
+                  label={t('email.tone')}
                   value={tone}
                   onChange={setTone}
                   options={[
-                    { value: 'friendly', label: 'Prietenos' },
-                    { value: 'empathetic', label: 'Empatic' },
-                    { value: 'authoritative', label: 'Autoritar' },
-                    { value: 'direct', label: 'Direct' },
+                    { value: 'friendly', label: t('email.tone.friendly') },
+                    { value: 'empathetic', label: t('email.tone.empathetic') },
+                    { value: 'authoritative', label: t('email.tone.authoritative') },
+                    { value: 'direct', label: t('email.tone.direct') },
                   ]}
                 />
                 <FanDropdown
-                  label="Limbă"
+                  label={t('email.language')}
                   value={language}
                   onChange={setLanguage}
                   options={[
@@ -421,9 +427,9 @@ export default function EmailMarketing() {
                 />
               </div>
 
-              <NeonInput label="Ofertă" value={offer} onChange={setOffer} placeholder={offerPlaceholder || ' '} />
-              <NeonInput label="Pain Point audiență" value={audiencePain} onChange={setAudiencePain} placeholder={painPlaceholder || ' '} />
-              <NeonInput label="Scop CTA" value={ctaGoal} onChange={setCtaGoal} placeholder="Ex: răspuns în email / DM keyword / booking call" />
+              <NeonInput label={t('email.offer')} value={offer} onChange={setOffer} placeholder={offerPlaceholder || ' '} />
+              <NeonInput label={t('email.audiencePain')} value={audiencePain} onChange={setAudiencePain} placeholder={painPlaceholder || ' '} />
+              <NeonInput label={t('email.ctaGoal')} value={ctaGoal} onChange={setCtaGoal} placeholder={t('email.placeholder.cta')} />
 
               <button
                 type="button"
@@ -435,9 +441,9 @@ export default function EmailMarketing() {
                   <div className="absolute inset-y-[-18%] left-[-18%] w-[42%] rounded-full bg-[#4CC9F055] blur-2xl" style={{ animation: 'ctaPlasma 4.8s ease-in-out infinite' }} />
                   <div className="absolute inset-y-[-18%] right-[-18%] w-[36%] rounded-full bg-[#8B5CF655] blur-2xl" style={{ animation: 'ctaPlasma 5.6s ease-in-out infinite reverse' }} />
                   <div className="relative">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[#7FDBFF]">Energy surge</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[#7FDBFF]">{t('email.energySurge')}</div>
                   <div className="mt-1 text-[28px] font-semibold leading-tight text-white">
-                    {generateMutation.isPending ? 'Generez emailul...' : 'Generează Email'}
+                    {generateMutation.isPending ? t('email.generating') : t('email.generate')}
                   </div>
                 </div>
               </div>
@@ -448,13 +454,13 @@ export default function EmailMarketing() {
           <div className="relative rounded-[32px] border border-[#4CC9F055] bg-black/40 p-5 shadow-[0_0_0_1px_rgba(76,201,240,0.08),0_25px_80px_rgba(0,0,0,0.36)] backdrop-blur-xl">
             <div className="mb-4 flex items-center justify-between gap-3">
               <SectionHeader
-                title="Output"
-                description="Secțiunile emailului se asamblează în carduri staggered, iar acțiunile apar ca FAB-uri minimaliste când pagina are scroll."
+                title={t('email.output')}
+                description={t('email.outputDescription')}
               />
               {copyStatus ? <span className="shrink-0 text-xs text-[#7FDBFF]">{copyStatus}</span> : null}
             </div>
 
-            {!result && !generateMutation.isPending ? <OutputIdle /> : null}
+            {!result && !generateMutation.isPending ? <OutputIdle title={t('email.idleTitle')} text={t('email.idleText')} /> : null}
 
             {generateMutation.isPending && (
               <div className="flex min-h-[560px] flex-col items-center justify-center text-center">
@@ -462,16 +468,16 @@ export default function EmailMarketing() {
                   <div className="absolute inset-5 rounded-full border border-cyan-300/35 animate-pulse" />
                   <div className="absolute inset-0 rounded-full border border-white/10 animate-pulse [animation-delay:180ms]" />
                 </div>
-                <h3 className="text-[22px] font-semibold text-white">Secvență de generare activă</h3>
+                <h3 className="text-[22px] font-semibold text-white">{t('email.loadingTitle')}</h3>
                 <p className="mt-2 max-w-md text-sm leading-6 text-slate-300/78">
-                  Brief-ul este scanat, modelul compune structura emailului și o transferă în panoul de output.
+                  {t('email.loadingText')}
                 </p>
               </div>
             )}
 
             {generateMutation.isError && (
               <div className="rounded-[22px] border border-rose-400/40 bg-rose-500/10 p-4 text-sm text-rose-200">
-                {(generateMutation.error as any)?.response?.data?.error || 'Nu am putut genera emailul.'}
+                {(generateMutation.error as any)?.response?.data?.error || t('email.error')}
               </div>
             )}
 
@@ -490,11 +496,11 @@ export default function EmailMarketing() {
                         onClick={() => handleCopy(card.body, card.title)}
                         className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-slate-300 transition hover:border-cyan-300/35 hover:text-white"
                       >
-                        Copiază
+                        {t('common.copy')}
                       </button>
                     </div>
 
-                    {card.title === 'Subiecte alternative' ? (
+                    {card.id === 'subjects' ? (
                       <div className="space-y-2 text-sm leading-6 text-slate-100/88">
                         {result.subjectOptions.map((subject, subjectIndex) => (
                           <div key={`${subject}-${subjectIndex}`} className="rounded-[18px] border border-white/8 bg-white/[0.03] px-4 py-3">
@@ -502,7 +508,7 @@ export default function EmailMarketing() {
                           </div>
                         ))}
                       </div>
-                    ) : card.title === 'Body Complet' ? (
+                    ) : card.id === 'body' ? (
                       <pre className="whitespace-pre-wrap text-sm leading-7 text-slate-100/88">{card.body}</pre>
                     ) : (
                       <div className="text-sm leading-7 text-slate-100/88 whitespace-pre-wrap">{card.body}</div>

@@ -6,6 +6,7 @@ import { colors } from '../constants/colors';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { authAPI, ideaAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 interface StructuredIdeaResponse {
   mainIdea: string;
@@ -15,20 +16,6 @@ interface StructuredIdeaResponse {
   ctaStyleApplied: string;
   improvements: string[];
 }
-
-const DEFAULT_IMPROVEMENTS = [
-  'Mesaj clarificat',
-  'Redundanță eliminată',
-  'Structură adăugată',
-  'Ton adaptat la nișă',
-];
-
-const DEFAULT_SECTION_TITLES = [
-  'PARTEA 1 – Context',
-  'PARTEA 2 – Explicație clară',
-  'PARTEA 3 – Exemplu / aplicație',
-  'PARTEA 4 – Principiu final',
-];
 
 function normalizeTextValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -43,7 +30,7 @@ function normalizeLooseComparisonText(value: string): string {
     .toLowerCase();
 }
 
-function normalizeStructuredIdeaTitle(value: unknown): string {
+function normalizeStructuredIdeaTitle(value: unknown, defaultSectionTitles: string[]): string {
   if (!value || typeof value !== 'object') {
     return '';
   }
@@ -61,7 +48,7 @@ function normalizeStructuredIdeaTitle(value: unknown): string {
   }
 
   const normalizedRawTitle = normalizeLooseComparisonText(rawTitle);
-  const matchedDefaultTitle = DEFAULT_SECTION_TITLES.find((title) =>
+  const matchedDefaultTitle = defaultSectionTitles.find((title) =>
     normalizedRawTitle.startsWith(normalizeLooseComparisonText(title))
   );
 
@@ -78,7 +65,11 @@ function normalizeSectionText(section: Record<string, unknown>): string {
   );
 }
 
-function normalizeStructuredIdeaResponse(value: unknown): StructuredIdeaResponse | null {
+function normalizeStructuredIdeaResponse(
+  value: unknown,
+  defaultSectionTitles: string[],
+  defaultImprovements: string[]
+): StructuredIdeaResponse | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
@@ -95,24 +86,37 @@ function normalizeStructuredIdeaResponse(value: unknown): StructuredIdeaResponse
   return {
     mainIdea: normalizeTextValue(source.mainIdea),
     hooks: hooks.length > 0 ? hooks : ['', ''],
-    script: DEFAULT_SECTION_TITLES.map((title, index) => {
+    script: defaultSectionTitles.map((title, index) => {
       const section = rawScript[index];
       const part = section && typeof section === 'object' ? (section as Record<string, unknown>) : {};
 
       return {
-        sectionTitle: normalizeStructuredIdeaTitle(part) || title,
+        sectionTitle: normalizeStructuredIdeaTitle(part, defaultSectionTitles) || title,
         text: normalizeSectionText(part),
       };
     }),
     cta: normalizeTextValue(source.cta),
     ctaStyleApplied: normalizeTextValue(source.ctaStyleApplied),
-    improvements: improvements.length > 0 ? improvements : DEFAULT_IMPROVEMENTS,
+    improvements: improvements.length > 0 ? improvements : defaultImprovements,
   };
 }
 
 export default function IdeaStructurerScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
   const [ideaText, setIdeaText] = useState('');
+  const defaultSectionTitles = [
+    t('structurer.defaultSection1'),
+    t('structurer.defaultSection2'),
+    t('structurer.defaultSection3'),
+    t('structurer.defaultSection4'),
+  ];
+  const defaultImprovements = [
+    t('structurer.defaultImprovement1'),
+    t('structurer.defaultImprovement2'),
+    t('structurer.defaultImprovement3'),
+    t('structurer.defaultImprovement4'),
+  ];
 
   const { data: userData } = useQuery({
     queryKey: ['user-me'],
@@ -130,12 +134,16 @@ export default function IdeaStructurerScreen() {
       const message =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
-        'Nu am putut structura ideea.';
-      Alert.alert('Eroare', message);
+        t('structurer.error');
+      Alert.alert(t('daily.error'), message);
     },
   });
 
-  const result = normalizeStructuredIdeaResponse(structureMutation.data?.data);
+  const result = normalizeStructuredIdeaResponse(
+    structureMutation.data?.data,
+    defaultSectionTitles,
+    defaultImprovements
+  );
   const hasVisibleResult = !!(
     result &&
     (result.mainIdea ||
@@ -150,16 +158,16 @@ export default function IdeaStructurerScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Card style={styles.card}>
-        <Text style={styles.title}>Ai deja ideea? Pune-o aici.</Text>
-        <Text style={styles.subtitle}>📝 Scrie ideea ta, exact cum îți vine.</Text>
+        <Text style={styles.title}>{t('structurer.title')}</Text>
+        <Text style={styles.subtitle}>{t('structurer.subtitle')}</Text>
 
         {!hasNiche ? (
           <View style={styles.warningBox}>
             <Text style={styles.warningText}>
-              Ca să adaptăm corect la nișa ta, completează întâi Niche Finder.
+              {t('structurer.nicheRequired')}
             </Text>
             <Button
-              title="🎯 Mergi la Niche Finder"
+              title={t('structurer.goNiche')}
               onPress={() => navigation.navigate('NicheFinder')}
             />
           </View>
@@ -169,7 +177,7 @@ export default function IdeaStructurerScreen() {
               multiline
               value={ideaText}
               onChangeText={setIdeaText}
-              placeholder="Ex: Vreau să vorbesc despre de ce oamenii renunță după 2 săptămâni și cum pot face procesul mai simplu..."
+              placeholder={t('structurer.placeholder')}
               placeholderTextColor={colors.text.muted}
               style={styles.bigInput}
               textAlignVertical="top"
@@ -177,7 +185,7 @@ export default function IdeaStructurerScreen() {
             />
             <View style={styles.actionRow}>
               <Button
-                title="➡ Structurează"
+                title={t('structurer.submit')}
                 onPress={() => structureMutation.mutate(ideaText)}
                 loading={structureMutation.isPending}
                 disabled={!canSubmit}
@@ -190,7 +198,7 @@ export default function IdeaStructurerScreen() {
       {structureMutation.isSuccess && !hasVisibleResult && (
         <Card style={styles.warningCard}>
           <Text style={styles.warningText}>
-            Răspunsul a venit incomplet. Încearcă din nou; ecranul nu mai cade, dar rezultatul nu a putut fi afișat.
+            {t('structurer.incomplete')}
           </Text>
         </Card>
       )}
@@ -198,12 +206,12 @@ export default function IdeaStructurerScreen() {
       {hasVisibleResult && result && (
         <View style={styles.resultsWrap}>
           <Card style={styles.card}>
-            <Text style={styles.sectionTitle}>Ideea principală</Text>
+            <Text style={styles.sectionTitle}>{t('structurer.mainIdea')}</Text>
             <Text style={styles.bodyText}>{result.mainIdea}</Text>
           </Card>
 
           <Card style={styles.card}>
-            <Text style={styles.sectionTitle}>Hook (2 variante)</Text>
+            <Text style={styles.sectionTitle}>{t('structurer.hooks')}</Text>
             {result.hooks.map((hook, idx) => (
               <View key={`hook-${idx}`} style={styles.itemBox}>
                 <Text style={styles.bodyText}>{idx + 1}. {hook}</Text>
@@ -212,7 +220,7 @@ export default function IdeaStructurerScreen() {
           </Card>
 
           <Card style={styles.card}>
-            <Text style={styles.sectionTitle}>Script structurat</Text>
+            <Text style={styles.sectionTitle}>{t('structurer.script')}</Text>
             {result.script.map((part, idx) => (
               <View key={`part-${idx}`} style={styles.itemBox}>
                 <Text style={styles.partTitle}>{part.sectionTitle}</Text>
@@ -222,13 +230,15 @@ export default function IdeaStructurerScreen() {
           </Card>
 
           <Card style={styles.card}>
-            <Text style={styles.sectionTitle}>CTA adaptat</Text>
-            <Text style={styles.metaText}>Stil aplicat: {result.ctaStyleApplied}</Text>
+            <Text style={styles.sectionTitle}>{t('structurer.cta')}</Text>
+            <Text style={styles.metaText}>
+              {t('structurer.ctaStyle', { style: result.ctaStyleApplied })}
+            </Text>
             <Text style={styles.bodyText}>{result.cta}</Text>
           </Card>
 
           <Card style={styles.card}>
-            <Text style={styles.sectionTitle}>Ce a fost îmbunătățit</Text>
+            <Text style={styles.sectionTitle}>{t('structurer.improvements')}</Text>
             {result.improvements.map((item, idx) => (
               <Text key={`impr-${idx}`} style={styles.bodyText}>• {item}</Text>
             ))}

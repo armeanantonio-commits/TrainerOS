@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/hooks/useI18n';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
 import Card from '@/components/Card';
 
 export default function Login() {
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -34,17 +36,17 @@ export default function Login() {
       
       // Translate to Romanian
       if (errorMessage === 'Invalid credentials') {
-        setError('❌ Email sau parolă incorectă. Încearcă din nou.');
+        setError(t('auth.loginInvalidCredentials'));
       } else if (errorMessage?.toLowerCase().includes('activate your account')) {
-        setError('❌ Contul nu este activat. Verifică email-ul și accesează link-ul de activare.');
+        setError(t('auth.loginInactive'));
       } else if (errorMessage?.toLowerCase().includes('email')) {
-        setError('Email invalid. Verifică adresa introdusă.');
+        setError(t('auth.loginInvalidEmail'));
       } else if (errorMessage?.toLowerCase().includes('password')) {
-        setError('Parolă incorectă. Încearcă din nou.');
+        setError(t('auth.loginInvalidPassword'));
       } else if (errorMessage?.toLowerCase().includes('not found')) {
-        setError('❌ Cont inexistent. Încearcă să te înregistrezi.');
+        setError(t('auth.loginMissingAccount'));
       } else {
-        setError(errorMessage || 'Login eșuat. Încearcă din nou.');
+        setError(errorMessage || t('auth.loginFailed'));
       }
     } finally {
       setIsLoading(false);
@@ -64,8 +66,8 @@ export default function Login() {
             />
             <span className="text-white font-bold text-2xl font-display">TrainerOS</span>
           </Link>
-          <h1 className="text-3xl font-bold text-white mt-4 font-display">Bine ai revenit</h1>
-          <p className="text-gray-300 mt-2">Loghează-te în contul tău</p>
+          <h1 className="text-3xl font-bold text-white mt-4 font-display">{t('auth.loginTitle')}</h1>
+          <p className="text-gray-300 mt-2">{t('auth.loginSubtitle')}</p>
         </div>
 
         <Card>
@@ -93,7 +95,7 @@ export default function Login() {
 
             <Input
               type="password"
-              label="Parolă"
+              label={t('auth.password')}
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -103,23 +105,23 @@ export default function Login() {
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-gray-300">
                 <input type="checkbox" className="rounded" />
-                Ține-mă minte
+                {t('auth.rememberMe')}
               </label>
               <Link to="/forgot-password" className="text-brand-500 hover:text-brand-400">
-                Ai uitat parola?
+                {t('auth.forgotTitle')}
               </Link>
             </div>
 
             <Button type="submit" className="w-full" isLoading={isLoading}>
-              Login
+              {t('auth.loginCta')}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-gray-300 text-sm">
-              Nu ai cont?{' '}
+              {t('auth.noAccount')}{' '}
               <Link to="/register" className="text-brand-500 hover:text-brand-400 font-semibold">
-                Înregistrează-te gratuit
+                {t('auth.registerFree')}
               </Link>
             </p>
           </div>

@@ -4,8 +4,10 @@ import { authAPI } from '@/services/api';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
 import Card from '@/components/Card';
+import { useI18n } from '@/hooks/useI18n';
 
 export default function ResetPassword() {
+  const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
   const [password, setPassword] = useState('');
@@ -20,27 +22,27 @@ export default function ResetPassword() {
     setSuccess('');
 
     if (!token) {
-      setError('Missing reset token. Please use the reset link from your email.');
+      setError(t('auth.resetTokenMissing'));
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(t('auth.resetPasswordMin'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('auth.resetPasswordsMismatch'));
       return;
     }
 
     setIsLoading(true);
     try {
       const { data } = await authAPI.resetPassword({ token, password });
-      setSuccess(data.message || 'Password reset successful. You can now log in.');
+      setSuccess(data.message || t('auth.resetSuccess'));
     } catch (err: any) {
       const errorMessage = err.response?.data?.error || err.message;
-      setError(errorMessage || 'Password reset failed. Please request a new reset link.');
+      setError(errorMessage || t('auth.resetFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -56,8 +58,8 @@ export default function ResetPassword() {
             </div>
             <span className="text-white font-bold text-2xl font-display">TrainerOS</span>
           </Link>
-          <h1 className="text-3xl font-bold text-white mt-4 font-display">Set New Password</h1>
-          <p className="text-gray-300 mt-2">Choose a new password for your account.</p>
+          <h1 className="text-3xl font-bold text-white mt-4 font-display">{t('auth.resetTitle')}</h1>
+          <p className="text-gray-300 mt-2">{t('auth.resetSubtitle')}</p>
         </div>
 
         <Card>
@@ -75,8 +77,8 @@ export default function ResetPassword() {
 
             <Input
               type="password"
-              label="New Password"
-              placeholder="Minimum 6 characters"
+              label={t('auth.newPassword')}
+              placeholder={t('auth.newPasswordPlaceholder')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -84,21 +86,21 @@ export default function ResetPassword() {
 
             <Input
               type="password"
-              label="Confirm New Password"
-              placeholder="Repeat your password"
+              label={t('auth.confirmNewPassword')}
+              placeholder={t('auth.confirmNewPasswordPlaceholder')}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
 
             <Button type="submit" className="w-full" isLoading={isLoading}>
-              Reset Password
+              {t('auth.resetPassword')}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
             <Link to="/login" className="text-brand-500 hover:text-brand-400 font-semibold">
-              Back to Login
+              {t('auth.backToLogin')}
             </Link>
           </div>
         </Card>

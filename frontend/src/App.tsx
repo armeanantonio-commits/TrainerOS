@@ -9,6 +9,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import CookieBanner from '@/components/CookieBanner';
 import SeoManager from '@/components/SeoManager';
 import Button from '@/components/Button';
+import { useI18n } from '@/hooks/useI18n';
 
 // Public Pages
 import Home from '@/pages/Home';
@@ -43,16 +44,17 @@ import Chat from '@/pages/Chat';
 import EmailMarketing from '@/pages/EmailMarketing';
 
 function UpcomingNutritionFeature() {
+  const { t } = useI18n();
   return (
     <div className="flex min-h-[calc(100dvh-12rem)] items-center justify-center px-4 py-12">
       <div className="console-panel-strong max-w-2xl rounded-[30px] p-8 text-center">
-        <p className="console-kicker mb-3">Upcoming Feature</p>
+        <p className="console-kicker mb-3">{t('app.upcomingFeature')}</p>
         <h1 className="mb-4 text-3xl font-bold text-white font-display">Nutriția nu este încă activă</h1>
         <p className="mb-6 text-slate-300">
           Modulul de nutriție este încă în lucru. Îl activăm după ce finalizăm fluxul și validăm output-ul.
         </p>
         <Link to="/dashboard">
-          <Button variant="outline">Înapoi la Dashboard</Button>
+          <Button variant="outline">Înapoi la dashboard</Button>
         </Link>
       </div>
     </div>
@@ -112,6 +114,7 @@ function GlobalBackButton() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const navigationType = useNavigationType();
+  const { t } = useI18n();
 
   const hiddenRoutes = [
     '/',
@@ -151,7 +154,7 @@ function GlobalBackButton() {
   return (
     <div className="mx-auto mb-4 flex w-full max-w-7xl px-4 sm:px-6 lg:px-8">
       <Button variant="outline" size="sm" onClick={handleBack}>
-        ← Înapoi
+        ← {t('common.back')}
       </Button>
     </div>
   );

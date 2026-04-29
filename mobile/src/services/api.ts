@@ -48,7 +48,7 @@ export const authAPI = {
   resetPassword: (data: { token: string; password: string }) =>
     api.post('/auth/reset-password', data),
   me: () => api.get('/auth/me'),
-  updateProfile: (data: { email?: string; name?: string }) =>
+  updateProfile: (data: { email?: string; name?: string; preferredLanguage?: 'ro' | 'en' }) =>
     api.put('/auth/profile', data),
 };
 

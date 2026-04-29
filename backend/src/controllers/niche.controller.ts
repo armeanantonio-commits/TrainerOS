@@ -9,6 +9,7 @@ import {
   releaseGenerationLock,
 } from '../lib/generation-lock.js';
 import { generateUniqueResult } from '../lib/generation-history.js';
+import { normalizeLanguage } from '../lib/language.js';
 
 const quickNicheSchema = z.object({
   quickNiche: z.string().min(5),
@@ -18,6 +19,13 @@ const quickNicheSchema = z.object({
 const presetNicheSelectionSchema = z.object({
   niche: z.string().min(5),
   description: z.string().optional().default(''),
+});
+
+const translateProfileSchema = z.object({
+  niche: z.string().optional().default(''),
+  idealClient: z.string().optional().default(''),
+  positioning: z.string().optional().default(''),
+  targetLanguage: z.enum(['ro', 'en']),
 });
 
 const quickICPSchema = z.object({
@@ -190,6 +198,7 @@ export async function generateQuick(req: Request, res: Response): Promise<void> 
     }
 
     const data = quickNicheSchema.parse(req.body);
+    const language = normalizeLanguage(req.user.preferredLanguage);
     const generationKey = acquireNicheLockOrRespond(req, res);
     if (!generationKey) {
       return;
@@ -203,6 +212,7 @@ export async function generateQuick(req: Request, res: Response): Promise<void> 
         generate: ({ recentOutputs, duplicateAttempt }) =>
           openaiService.generateNicheQuick({
             ...data,
+            language,
             generationContext: {
               recentOutputs,
               duplicateAttempt,
@@ -243,6 +253,7 @@ export async function savePresetNicheSelection(req: Request, res: Response): Pro
     }
 
     const data = presetNicheSelectionSchema.parse(req.body);
+    const language = normalizeLanguage(req.user.preferredLanguage);
     const generationKey = acquireNicheLockOrRespond(req, res);
     if (!generationKey) {
       return;
@@ -255,6 +266,7 @@ export async function savePresetNicheSelection(req: Request, res: Response): Pro
         persistentValues: buildCurrentNicheSnapshot(req),
         generate: ({ recentOutputs, duplicateAttempt }) => openaiService.generateNicheQuick({
           quickNiche: data.niche,
+          language,
           generationContext: {
             recentOutputs,
             duplicateAttempt,
@@ -297,6 +309,7 @@ export async function generateWizard(req: Request, res: Response): Promise<void>
     }
 
     const data = wizardNicheSchema.parse(req.body);
+    const language = normalizeLanguage(req.user.preferredLanguage);
     const generationKey = acquireNicheLockOrRespond(req, res);
     if (!generationKey) {
       return;
@@ -310,6 +323,7 @@ export async function generateWizard(req: Request, res: Response): Promise<void>
         generate: ({ recentOutputs, duplicateAttempt }) =>
           openaiService.generateNicheWizard({
             ...data,
+            language,
             generationContext: {
               recentOutputs,
               duplicateAttempt,
@@ -350,6 +364,7 @@ export async function generateDiscover(req: Request, res: Response): Promise<voi
     }
 
     const data = discoverNicheSchema.parse(req.body);
+    const language = normalizeLanguage(req.user.preferredLanguage);
     const generationKey = acquireNicheLockOrRespond(req, res);
     if (!generationKey) {
       return;
@@ -363,6 +378,7 @@ export async function generateDiscover(req: Request, res: Response): Promise<voi
         generate: ({ recentOutputs, duplicateAttempt }) =>
           openaiService.generateNicheDiscover({
             ...data,
+            language,
             generationContext: {
               recentOutputs,
               duplicateAttempt,
@@ -403,6 +419,7 @@ export async function generateICPDay(req: Request, res: Response): Promise<void>
     }
 
     const data = icpDaySchema.parse(req.body);
+    const language = normalizeLanguage(req.user.preferredLanguage);
     const generationKey = acquireNicheLockOrRespond(req, res);
     if (!generationKey) {
       return;
@@ -416,6 +433,7 @@ export async function generateICPDay(req: Request, res: Response): Promise<void>
         generate: ({ recentOutputs, duplicateAttempt }) =>
           openaiService.generateICPDay({
             ...data,
+            language,
             generationContext: {
               recentOutputs,
               duplicateAttempt,
@@ -452,6 +470,7 @@ export async function generateNicheVariants(req: Request, res: Response): Promis
     }
 
     const data = nicheVariantsSchema.parse(req.body);
+    const language = normalizeLanguage(req.user.preferredLanguage);
     const generationKey = acquireNicheLockOrRespond(req, res);
     if (!generationKey) {
       return;
@@ -464,6 +483,7 @@ export async function generateNicheVariants(req: Request, res: Response): Promis
         generate: ({ recentOutputs, duplicateAttempt }) =>
           openaiService.generateNicheVariants({
             ...data,
+            language,
             generationContext: {
               recentOutputs,
               duplicateAttempt,
@@ -497,6 +517,7 @@ export async function generatePresetNiches(req: Request, res: Response): Promise
     }
 
     try {
+      const language = normalizeLanguage(req.user.preferredLanguage);
       const result = await generateUniqueResult({
         userId: req.user.id,
         section: 'niche-preset-options',
@@ -504,6 +525,7 @@ export async function generatePresetNiches(req: Request, res: Response): Promise
           openaiService.generatePresetNicheOptions({
             recentOutputs,
             duplicateAttempt,
+            language,
           }),
       });
 
@@ -524,6 +546,7 @@ export async function generateQuickICP(req: Request, res: Response): Promise<voi
     }
 
     const data = quickICPSchema.parse(req.body);
+    const language = normalizeLanguage(req.user.preferredLanguage);
     const generationKey = acquireNicheLockOrRespond(req, res);
     if (!generationKey) {
       return;
@@ -537,11 +560,23 @@ export async function generateQuickICP(req: Request, res: Response): Promise<voi
         generate: ({ recentOutputs, duplicateAttempt }) =>
           openaiService.generateNicheQuickICP({
             ...data,
+            language,
             generationContext: {
               recentOutputs,
               duplicateAttempt,
             },
           }),
+      });
+
+      console.info('[niche-quick-icp] generation result', {
+        userId: req.user.id,
+        language,
+        sources: result.sources,
+        lengths: {
+          niche: typeof result.niche === 'string' ? result.niche.length : 0,
+          idealClient: typeof result.idealClient === 'string' ? result.idealClient.length : 0,
+          positioning: typeof result.positioning === 'string' ? result.positioning.length : 0,
+        },
       });
 
       // Save to user profile
@@ -595,6 +630,40 @@ export async function resetNiche(req: Request, res: Response): Promise<void> {
   } catch (error: any) {
     console.error('Reset niche error:', error);
     res.status(500).json({ error: error.message || 'Failed to reset niche' });
+  }
+}
+
+export async function translateProfile(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const data = translateProfileSchema.parse(req.body);
+    const profile = await openaiService.translateNicheProfile({
+      niche: data.niche,
+      idealClient: data.idealClient,
+      positioning: data.positioning,
+      targetLanguage: normalizeLanguage(data.targetLanguage),
+    });
+
+    res.json({
+      success: true,
+      profile: {
+        niche: profile.niche,
+        icpProfile: profile.idealClient,
+        positioningMessage: profile.positioning,
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: error.errors });
+      return;
+    }
+
+    console.error('Translate niche profile error:', error);
+    res.status(500).json({ error: error.message || 'Failed to translate niche profile' });
   }
 }
 
@@ -680,6 +749,7 @@ export default {
   generatePresetNiches,
   generateDiscover,
   generateICPDay,
+  translateProfile,
   resetNiche,
   saveContentPreferences,
   getContentPreferences,

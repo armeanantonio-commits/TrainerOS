@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/hooks/useI18n';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
 import Card from '@/components/Card';
 
 export default function Register() {
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,7 +22,7 @@ export default function Register() {
     setError('');
 
     if (password.length < 6) {
-      setError('Parola trebuie să aibă minim 6 caractere');
+      setError(t('auth.passwordMinShort'));
       return;
     }
 
@@ -36,11 +38,11 @@ export default function Register() {
       if (err.response?.data?.error === 'Validation error' && err.response?.data?.details) {
         const details = err.response.data.details[0];
         if (details.path[0] === 'email') {
-          setError('Email invalid. Verifică adresa introdusă.');
+          setError(t('auth.registerInvalidEmail'));
         } else if (details.path[0] === 'password') {
-          setError('Parolă invalidă. Minim 6 caractere necesare.');
+          setError(t('auth.registerInvalidPassword'));
         } else {
-          setError(details.message || 'Date invalide. Verifică formularul.');
+          setError(details.message || t('auth.registerInvalidData'));
         }
         return;
       }
@@ -49,13 +51,13 @@ export default function Register() {
       const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message;
       
       if (errorMessage === 'Email already registered') {
-        setError('❌ Acest email este deja înregistrat. Încearcă să te loghezi.');
+        setError(t('auth.registerEmailExists'));
       } else if (errorMessage?.toLowerCase().includes('email')) {
-        setError('Email invalid. Verifică adresa introdusă.');
+        setError(t('auth.registerInvalidEmail'));
       } else if (errorMessage?.toLowerCase().includes('password')) {
-        setError('Parolă invalidă. Minim 6 caractere necesare.');
+        setError(t('auth.registerInvalidPassword'));
       } else {
-        setError(errorMessage || 'Înregistrarea a eșuat. Încearcă din nou.');
+        setError(errorMessage || t('auth.registerFailed'));
       }
     } finally {
       setIsLoading(false);
@@ -74,9 +76,9 @@ export default function Register() {
             <span className="text-white font-bold text-2xl font-display">TrainerOS</span>
           </Link>
           <h1 className="text-3xl font-bold text-white mt-4 font-display">
-            Începe Free Trial
+            {t('auth.registerTitle')}
           </h1>
-          <p className="text-gray-300 mt-2">7 zile gratuit. Fără card necesar.</p>
+          <p className="text-gray-300 mt-2">{t('auth.registerSubtitle')}</p>
         </div>
 
         <Card>
@@ -89,7 +91,7 @@ export default function Register() {
 
             <Input
               type="text"
-              label="Nume complet"
+              label={t('auth.fullName')}
               placeholder="Ion Popescu"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -107,8 +109,8 @@ export default function Register() {
 
             <Input
               type="password"
-              label="Parolă"
-              placeholder="Minim 6 caractere"
+              label={t('auth.password')}
+              placeholder={t('auth.newPasswordPlaceholder')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -116,7 +118,7 @@ export default function Register() {
 
             <Input
               type="text"
-              label="Cod promoțional (opțional)"
+              label={t('auth.promoOptional')}
               placeholder="ex: LAUNCH2026"
               value={promoCode}
               onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
@@ -124,7 +126,7 @@ export default function Register() {
             {promoCode === 'LAUNCH2026' && (
               <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
                 <p className="text-green-400 text-sm font-semibold">
-                  ✓ Cod valid! Prima lună: €12.99 în loc de €19.9
+                  {t('auth.promoValid')}
                 </p>
               </div>
             )}
@@ -133,20 +135,20 @@ export default function Register() {
               <label className="flex items-start gap-2">
                 <input type="checkbox" className="mt-1" required />
                 <span>
-                  Sunt de acord cu{' '}
+                  {t('auth.acceptTerms')}{' '}
                   <Link to="/terms" className="text-brand-500 hover:text-brand-400">
-                    Termenii și Condițiile
+                    {t('auth.terms')}
                   </Link>{' '}
                   și{' '}
                   <Link to="/privacy" className="text-brand-500 hover:text-brand-400">
-                    Politica de Confidențialitate
+                    {t('auth.privacy')}
                   </Link>
                 </span>
               </label>
             </div>
 
             <Button type="submit" className="w-full" isLoading={isLoading}>
-              Creează Cont Gratuit
+              {t('auth.createFreeAccount')}
             </Button>
           </form>
 
@@ -155,15 +157,15 @@ export default function Register() {
               <ul className="space-y-2 text-sm text-gray-300">
                 <li className="flex items-center gap-2">
                   <span className="text-brand-500">✓</span>
-                  7 zile trial gratuit
+                  {t('auth.trialBenefit1')}
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-brand-500">✓</span>
-                  Nu e nevoie de card
+                  {t('auth.trialBenefit2')}
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-brand-500">✓</span>
-                  Poți anula oricând
+                  {t('auth.trialBenefit3')}
                 </li>
               </ul>
             </div>
@@ -171,9 +173,9 @@ export default function Register() {
 
           <div className="mt-6 text-center">
             <p className="text-gray-300 text-sm">
-              Ai deja cont?{' '}
+              {t('auth.haveAccount')}{' '}
               <Link to="/login" className="text-brand-500 hover:text-brand-400 font-semibold">
-                Login
+                {t('auth.loginCta')}
               </Link>
             </p>
           </div>

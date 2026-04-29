@@ -14,6 +14,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import { feedbackAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 
@@ -44,6 +45,7 @@ interface SelectedVideoFile {
 
 export default function ContentReviewScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
   const [selectedFile, setSelectedFile] = useState<SelectedVideoFile | null>(null);
   const [textContent, setTextContent] = useState('');
   const [format, setFormat] = useState('reel');
@@ -54,7 +56,7 @@ export default function ContentReviewScreen() {
       feedbackAPI.analyze(payload),
     onSuccess: (response) => {
       setReviewResult(response.data);
-      Alert.alert('Succes', 'Videoclip analizat cu succes!');
+      Alert.alert(t('review.success'), t('review.videoSuccess'));
       if (response?.data?.id) {
         navigation.navigate('FeedbackDetail', { id: response.data.id });
       }
@@ -63,8 +65,8 @@ export default function ContentReviewScreen() {
       const message =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
-        'Nu am putut analiza videoclipul';
-      Alert.alert('Eroare', message);
+        t('review.videoError');
+      Alert.alert(t('daily.error'), message);
     },
   });
 
@@ -73,13 +75,13 @@ export default function ContentReviewScreen() {
       feedbackAPI.analyzeText(data),
     onSuccess: (response) => {
       setReviewResult(response.data);
-      Alert.alert('Succes', 'Text analizat cu succes!');
+      Alert.alert(t('review.success'), t('review.textSuccess'));
       if (response?.data?.id) {
         navigation.navigate('FeedbackDetail', { id: response.data.id });
       }
     },
     onError: () => {
-      Alert.alert('Eroare', 'Nu am putut analiza textul');
+      Alert.alert(t('daily.error'), t('review.textError'));
     },
   });
 
@@ -87,7 +89,7 @@ export default function ContentReviewScreen() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Permisiune necesară', 'Te rugăm să permiți accesul la galerie pentru a selecta un videoclip.');
+        Alert.alert(t('review.permissionTitle'), t('review.permissionText'));
         return;
       }
 
@@ -101,8 +103,10 @@ export default function ContentReviewScreen() {
         const picked = result.assets[0];
         if (picked.fileSize && picked.fileSize > MAX_UPLOAD_BYTES) {
           Alert.alert(
-            'Fișier prea mare',
-            `Dimensiunea maximă este 500MB. Fișierul tău are ${(picked.fileSize / 1024 / 1024).toFixed(1)}MB.`
+            t('review.fileTooLarge'),
+            t('review.fileTooLargeText', {
+              size: (picked.fileSize / 1024 / 1024).toFixed(1),
+            })
           );
           return;
         }
@@ -116,13 +120,13 @@ export default function ContentReviewScreen() {
         setReviewResult(null);
       }
     } catch (error) {
-      Alert.alert('Eroare', 'Nu am putut selecta videoclipul');
+      Alert.alert(t('daily.error'), t('review.pickError'));
     }
   };
 
   const handleVideoUpload = () => {
     if (!selectedFile) {
-      Alert.alert('Eroare', 'Selectează mai întâi un videoclip');
+      Alert.alert(t('daily.error'), t('review.selectVideo'));
       return;
     }
 
@@ -139,7 +143,7 @@ export default function ContentReviewScreen() {
 
   const handleTextSubmit = () => {
     if (!textContent.trim()) {
-      Alert.alert('Eroare', 'Introdu un text');
+      Alert.alert(t('daily.error'), t('review.enterText'));
       return;
     }
     setReviewResult(null);
@@ -149,12 +153,12 @@ export default function ContentReviewScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>📱 Content Review</Text>
+        <Text style={styles.title}>{t('review.title')}</Text>
         <Text style={styles.subtitle}>
-          Primește feedback AI pentru conținutul tău
+          {t('review.subtitle')}
         </Text>
         <Button
-          title="Vezi Istoric Review-uri"
+          title={t('review.history')}
           variant="outline"
           onPress={() => navigation.navigate('FeedbackHistory')}
           style={styles.historyButton}
@@ -162,9 +166,9 @@ export default function ContentReviewScreen() {
       </View>
 
       <Card style={styles.card}>
-        <Text style={styles.cardTitle}>Încarcă Videoclip</Text>
+        <Text style={styles.cardTitle}>{t('review.uploadVideo')}</Text>
         <Button
-          title={selectedFile ? 'Schimbă Videoclipul' : 'Alege Videoclip'}
+          title={selectedFile ? t('review.changeVideo') : t('review.chooseVideo')}
           onPress={pickVideo}
           variant="outline"
         />
@@ -173,7 +177,7 @@ export default function ContentReviewScreen() {
         )}
         {selectedFile && (
           <Button
-            title="Analizează Videoclipul"
+            title={t('review.analyzeVideo')}
             onPress={handleVideoUpload}
             loading={videoMutation.isPending}
             style={styles.uploadButton}
@@ -182,18 +186,18 @@ export default function ContentReviewScreen() {
       </Card>
 
       <Card>
-        <Text style={styles.cardTitle}>Sau Analizează Text</Text>
+        <Text style={styles.cardTitle}>{t('review.orText')}</Text>
         <Input
-          label="Scriptul/Caption-ul Tău"
+          label={t('review.scriptCaption')}
           value={textContent}
           onChangeText={setTextContent}
-          placeholder="Introdu scriptul sau caption-ul..."
+          placeholder={t('review.textPlaceholder')}
           multiline={true}
           numberOfLines={6}
           style={styles.textArea}
         />
         <Button
-          title="Analizează Textul"
+          title={t('review.analyzeText')}
           onPress={handleTextSubmit}
           loading={textMutation.isPending}
         />
@@ -202,28 +206,28 @@ export default function ContentReviewScreen() {
       {reviewResult && (
         <>
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Rezultatul Analizei</Text>
+            <Text style={styles.cardTitle}>{t('review.result')}</Text>
             <View style={styles.overallBox}>
-              <Text style={styles.overallLabel}>Scor General</Text>
+              <Text style={styles.overallLabel}>{t('review.overallScore')}</Text>
               <Text style={styles.overallValue}>{reviewResult.overallScore}/100</Text>
             </View>
 
             <View style={styles.scoreRow}>
-              <Text style={styles.scoreLabel}>Claritate</Text>
+              <Text style={styles.scoreLabel}>{t('review.clarity')}</Text>
               <View style={styles.scoreTrack}>
                 <View style={[styles.scoreFill, { width: `${reviewResult.clarityScore}%` }]} />
               </View>
               <Text style={styles.scoreValue}>{reviewResult.clarityScore}</Text>
             </View>
             <View style={styles.scoreRow}>
-              <Text style={styles.scoreLabel}>Relevanță</Text>
+              <Text style={styles.scoreLabel}>{t('review.relevance')}</Text>
               <View style={styles.scoreTrack}>
                 <View style={[styles.scoreFill, { width: `${reviewResult.relevanceScore}%` }]} />
               </View>
               <Text style={styles.scoreValue}>{reviewResult.relevanceScore}</Text>
             </View>
             <View style={styles.scoreRow}>
-              <Text style={styles.scoreLabel}>Încredere</Text>
+              <Text style={styles.scoreLabel}>{t('review.trust')}</Text>
               <View style={styles.scoreTrack}>
                 <View style={[styles.scoreFill, { width: `${reviewResult.trustScore}%` }]} />
               </View>
@@ -240,21 +244,21 @@ export default function ContentReviewScreen() {
 
           {reviewResult.summary ? (
             <Card style={styles.card}>
-              <Text style={styles.cardTitle}>Rezumat</Text>
+              <Text style={styles.cardTitle}>{t('review.summary')}</Text>
               <Text style={styles.summaryText}>{reviewResult.summary}</Text>
             </Card>
           ) : null}
 
           {reviewResult.transcription ? (
             <Card style={styles.card}>
-              <Text style={styles.cardTitle}>Transcriere</Text>
+              <Text style={styles.cardTitle}>{t('review.transcription')}</Text>
               <Text style={styles.summaryText}>{reviewResult.transcription}</Text>
             </Card>
           ) : null}
 
           {reviewResult.suggestions && reviewResult.suggestions.length > 0 ? (
             <Card style={styles.card}>
-              <Text style={styles.cardTitle}>Sugestii</Text>
+              <Text style={styles.cardTitle}>{t('review.suggestions')}</Text>
               {reviewResult.suggestions.map((suggestion, index) => (
                 <View key={`${suggestion.category || 'suggestion'}-${index}`} style={styles.suggestionItem}>
                   <Text style={styles.suggestionCategory}>

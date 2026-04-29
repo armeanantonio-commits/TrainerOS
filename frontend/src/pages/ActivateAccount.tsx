@@ -3,29 +3,31 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { authAPI } from '@/services/api';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
+import { useI18n } from '@/hooks/useI18n';
 
 export default function ActivateAccount() {
+  const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
   const [state, setState] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Activating your account...');
+  const [message, setMessage] = useState(t('auth.activating'));
 
   useEffect(() => {
     const run = async () => {
       if (!token) {
         setState('error');
-        setMessage('Missing activation token. Please use the activation link from your email.');
+        setMessage(t('auth.activationTokenMissing'));
         return;
       }
 
       try {
         const { data } = await authAPI.activateAccount({ token });
         setState('success');
-        setMessage(data.message || 'Account activated successfully. You can now log in.');
+        setMessage(data.message || t('auth.activationSuccess'));
       } catch (err: any) {
         setState('error');
         const errorMessage = err.response?.data?.error || err.message;
-        setMessage(errorMessage || 'Activation failed. Please request a new activation link.');
+        setMessage(errorMessage || t('auth.activationFailed'));
       }
     };
 
@@ -42,7 +44,7 @@ export default function ActivateAccount() {
             </div>
             <span className="text-white font-bold text-2xl font-display">TrainerOS</span>
           </Link>
-          <h1 className="text-3xl font-bold text-white mt-4 font-display">Activate Account</h1>
+          <h1 className="text-3xl font-bold text-white mt-4 font-display">{t('auth.activateTitle')}</h1>
         </div>
 
         <Card>
@@ -62,7 +64,7 @@ export default function ActivateAccount() {
             )}
 
             <Link to="/login" className="block">
-              <Button className="w-full">Go to Login</Button>
+              <Button className="w-full">{t('auth.goToLogin')}</Button>
             </Link>
           </div>
         </Card>

@@ -5,6 +5,8 @@ import { authAPI, ideaAPI } from '@/services/api';
 import Button from '@/components/Button';
 import Card from '@/components/Card';
 import IdeaCard from '@/components/IdeaCard';
+import { useI18n } from '@/hooks/useI18n';
+import { useLocalizedNicheProfile } from '@/hooks/useLocalizedNicheProfile';
 
 const GENERAL_IDEA_PROMPT_COUNT_KEY = 'daily-idea-general-count';
 const GENERAL_IDEA_NICHE_PROMPT_SHOWN_KEY = 'daily-idea-niche-prompt-shown';
@@ -13,6 +15,7 @@ export default function DailyIdea() {
   const outputRef = useRef<HTMLDivElement | null>(null);
   const generationLockRef = useRef(false);
   const navigate = useNavigate();
+  const { language, t } = useI18n();
   const [generationMode, setGenerationMode] = useState<'niche' | 'general'>('niche');
   const [showNichePrompt, setShowNichePrompt] = useState(false);
   // Check if user has niche set
@@ -44,6 +47,12 @@ export default function DailyIdea() {
   const hasMalformedIdeaResponse = generateMutation.isSuccess && !hasCompleteIdeaSet;
   const isProcessing = generateMutation.isPending;
   const activeIdea = generatedIdeas?.[activeTab];
+  const localizedProfile = useLocalizedNicheProfile({
+    niche: userData?.niche,
+    icpProfile: userData?.icpProfile,
+    positioningMessage: userData?.positioningMessage,
+    enabled: !!userData,
+  });
 
   const handleGenerate = (mode: 'niche' | 'general') => {
     if (generationLockRef.current || generateMutation.isPending) {
@@ -108,39 +117,39 @@ export default function DailyIdea() {
           <div className="console-orb left-[-4rem] top-[-2rem] h-32 w-32 bg-cyan-300/18 animate-float-slow" />
           <div className="console-orb right-0 top-12 h-28 w-28 bg-indigo-300/16 animate-float-delay" />
           <div className="mb-6 flex flex-wrap items-center gap-3">
-            <span className="console-badge">Daily Idea Engine</span>
+            <span className="console-badge">{t('daily.badge')}</span>
           </div>
           <h1
             className={`mt-2 mb-4 font-bold text-white font-display transition-all duration-500 ease-in-out ${
               hasGeneratedIdea ? 'text-2xl sm:text-3xl' : 'text-4xl sm:text-5xl'
             }`}
           >
-            {hasGeneratedIdea ? 'Ideea este gata.' : (
+            {hasGeneratedIdea ? t('daily.generatedTitle') : (
               <>
-                Nu mai ghici ce să postezi.{' '}
-                <span className="bg-gradient-to-r from-[#8CF8D4] via-[#72CAFF] to-[#A78BFA] bg-clip-text text-transparent">Primești ideea gata.</span>
+                {t('daily.readyTitle')}{' '}
+                <span className="bg-gradient-to-r from-[#8CF8D4] via-[#72CAFF] to-[#A78BFA] bg-clip-text text-transparent">{t('daily.readyHighlight')}</span>
               </>
             )}
           </h1>
           <p className={`max-w-2xl text-slate-300/78 transition-all duration-500 ease-in-out ${hasGeneratedIdea ? 'text-sm' : 'text-lg'}`}>
             {hasGeneratedIdea
-              ? 'Rezultatul tău este mai jos. Poți schimba formatul sau genera imediat un set nou.'
-              : 'În fiecare zi, aplicația analizează nișa ta, obiectivele și audiența — și îți livrează postarea completă: hook, script, CTA și rațiunea din spate.'}
+              ? t('daily.generatedText')
+              : t('daily.readyText')}
           </p>
           {!hasGeneratedIdea && (
             <div className="mt-8 grid gap-3 md:grid-cols-3">
               <div className="console-stat">
-                <p className="console-kicker mb-2">Formats</p>
+                <p className="console-kicker mb-2">{t('daily.formats')}</p>
                 <p className="text-2xl font-bold text-white">Reel / Carousel / Story</p>
               </div>
               <div className="console-stat">
-                <p className="console-kicker mb-2">Input</p>
+                <p className="console-kicker mb-2">{t('daily.input')}</p>
                 <p className="text-2xl font-bold text-white">
-                  {hasNiche ? 'Niche or general' : 'General first'}
+                  {hasNiche ? t('daily.nicheOrGeneral') : t('daily.generalFirst')}
                 </p>
               </div>
               <div className="console-stat">
-                <p className="console-kicker mb-2">Latency</p>
+                <p className="console-kicker mb-2">{t('daily.latency')}</p>
                 <p className="text-2xl font-bold text-white">&lt; 2 min</p>
               </div>
             </div>
@@ -159,8 +168,8 @@ export default function DailyIdea() {
                   className="px-12"
                 >
                   {isProcessing && generationMode === 'niche'
-                    ? 'Se generează...'
-                    : 'Generează Ideea pe Nișa Mea →'}
+                    ? t('daily.generating')
+                    : t('daily.generateNiche')}
                 </Button>
               )}
               <Button
@@ -170,7 +179,7 @@ export default function DailyIdea() {
                 isLoading={isProcessing && generationMode === 'general'}
                 className="px-8"
               >
-                {hasNiche ? 'Generează o Idee Generală' : 'Generează o Idee Aleatoare cu AI →'}
+                {hasNiche ? t('daily.generateGeneral') : t('daily.generateRandom')}
               </Button>
               {!hasNiche && (
                 <Button
@@ -179,25 +188,25 @@ export default function DailyIdea() {
                   variant="outline"
                   className="px-8"
                 >
-                  Setează-ți Nișa
+                  {t('daily.setNiche')}
                 </Button>
               )}
             </div>
             {userData?.niche ? (
               <p className="mt-3 text-sm text-slate-300/74">
-                Nișa ta: <span className="text-console-accent">{userData.niche}</span>
+                {t('daily.yourNiche')}: <span className="text-console-accent">{localizedProfile.niche || userData.niche}</span>
               </p>
             ) : (
               <p className="mt-3 text-sm text-slate-300/74">
-                Nu ai nevoie de nișă ca să vezi idei generale generate de AI.
+                {t('daily.noNicheNeeded')}
               </p>
             )}
             <p className="mt-2 text-xs text-slate-400">
-              Butonul general ignoră nișa și generează idei fitness mai largi, în același format complet.
+              {t('daily.generalIgnoresNiche')}
             </p>
             {!hasBrandVoice && (
               <p className="mt-2 text-xs text-yellow-300">
-                Pentru scripturi și mai personalizate: setează{' '}
+                {t('daily.brandVoiceHint')}{' '}
                 <Link to="/content-preferences" className="underline">
                   Brand Voice
                 </Link>
@@ -205,7 +214,7 @@ export default function DailyIdea() {
               </p>
             )}
             <p className="mt-2 text-xs text-slate-400">
-              Generarea poate dura până la 2 minute.
+              {t('daily.generationCanTake')}
             </p>
           </div>
         )}
@@ -215,12 +224,12 @@ export default function DailyIdea() {
           <Card className="mx-auto max-w-3xl py-12 text-center">
             <div className="mx-auto mb-4 h-16 w-16 rounded-full border-4 border-cyan-300/50 border-t-transparent animate-spin" />
             <h3 className="text-xl font-bold text-white mb-2">
-              {generationMode === 'general' ? 'Se generează setul general...' : 'Se generează ideea...'}
+              {generationMode === 'general' ? t('daily.generatingGeneralSet') : t('daily.generatingIdea')}
             </h3>
             <p className="text-slate-300/78">
               {generationMode === 'general'
-                ? 'Creăm un set complet de idei fitness general, fără context de nișă'
-                : 'Analizăm nișa ta și creăm content-ul perfect'}
+                ? t('daily.generatingGeneralText')
+                : t('daily.generatingNicheText')}
             </p>
           </Card>
         )}
@@ -235,25 +244,25 @@ export default function DailyIdea() {
             </div>
             <h3 className="text-xl font-bold text-white mb-2">
               {!hasMalformedIdeaResponse && (generateMutation.error as any)?.response?.status === 429
-                ? 'Limită zilnică atinsă!'
-                : 'Oops! Ceva nu a mers bine'}
+                ? t('daily.limitReached')
+                : t('daily.oops')}
             </h3>
             <p className="text-gray-300 mb-6">
               {hasMalformedIdeaResponse
-                ? 'Am primit un răspuns incomplet pentru una dintre idei. Încearcă din nou.'
+                ? t('daily.malformed')
                 : (generateMutation.error as any)?.response?.data?.message || 
                   (generateMutation.error as any)?.response?.data?.error ||
-                  'Nu am putut genera ideea. Încearcă din nou.'}
+                  t('daily.generateError')}
             </p>
             {!hasMalformedIdeaResponse && (generateMutation.error as any)?.response?.status === 429 ? (
               <div className="flex gap-3 justify-center">
                 <Link to="/idea-history">
                   <Button variant="outline">
-                    📚 Vezi Ideile Generate
+                    {t('daily.viewGeneratedIdeas')}
                   </Button>
                 </Link>
                 <Button onClick={() => generateMutation.reset()}>
-                  👌 OK, am înțeles
+                  {t('daily.okUnderstood')}
                 </Button>
               </div>
             ) : (
@@ -261,12 +270,12 @@ export default function DailyIdea() {
                 {!hasNiche && (
                   <Link to="/niche-finder">
                     <Button variant="outline">
-                      🎯 Setează Nișa
+                      🎯 {t('daily.setNiche')}
                     </Button>
                   </Link>
                 )}
                 <Button onClick={() => handleGenerate(generationMode)}>
-                  🔄 Încearcă Din Nou
+                  {t('daily.tryAgain')}
                 </Button>
               </div>
             )}
@@ -285,9 +294,9 @@ export default function DailyIdea() {
                       <span className="text-2xl">💡</span>
                     </div>
                     <div>
-                      <h3 className="text-white font-bold">Ideea Zilei</h3>
+                      <h3 className="text-white font-bold">{t('daily.ideaOfDay')}</h3>
                       <p className="text-sm text-slate-300/72">
-                        {new Date().toLocaleDateString('ro-RO', {
+                        {new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'ro-RO', {
                           weekday: 'long',
                           day: 'numeric',
                           month: 'long',
@@ -295,7 +304,7 @@ export default function DailyIdea() {
                         })}
                       </p>
                       <p className="mt-1 text-xs text-slate-400">
-                        {generationMode === 'general' ? 'Mod general' : 'Mod bazat pe nișă'}
+                        {generationMode === 'general' ? t('daily.generalMode') : t('daily.nicheMode')}
                       </p>
                     </div>
                   </div>
@@ -353,10 +362,10 @@ export default function DailyIdea() {
                   variant="outline"
                   isLoading={isProcessing}
                 >
-                🔄 Generează Altă Idee
+                  {t('daily.generateAnother')}
                 </Button>
                 <Link to="/idea-history">
-                  <Button variant="outline">📚 Vezi Istoric</Button>
+                  <Button variant="outline">{t('daily.viewHistory')}</Button>
                 </Link>
               </div>
             </div>
@@ -367,16 +376,16 @@ export default function DailyIdea() {
         {!generateMutation.isSuccess && !hasMalformedIdeaResponse && (
           <div className="max-w-3xl mx-auto mt-16">
             <h2 className="text-2xl font-bold text-white text-center mb-8 font-display">
-              Cum funcționează Daily Idea Engine?
+              {t('daily.howItWorks')}
             </h2>
             <div className="grid md:grid-cols-3 gap-6">
               <Card className="text-center">
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10">
                   <span className="text-2xl">🎯</span>
                 </div>
-                <h3 className="text-white font-semibold mb-2">1. Analizează</h3>
+                <h3 className="text-white font-semibold mb-2">{t('daily.stepAnalyze')}</h3>
                 <p className="text-sm text-slate-300/72">
-                  AI-ul pornește fie de la nișa ta, fie dintr-un context fitness general
+                  {t('daily.stepAnalyzeText')}
                 </p>
               </Card>
 
@@ -384,9 +393,9 @@ export default function DailyIdea() {
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10">
                   <span className="text-2xl">✨</span>
                 </div>
-                <h3 className="text-white font-semibold mb-2">2. Creează</h3>
+                <h3 className="text-white font-semibold mb-2">{t('daily.stepCreate')}</h3>
                 <p className="text-sm text-slate-300/72">
-                  Generează hook, script, CTA și reasoning bazat pe date reale
+                  {t('daily.stepCreateText')}
                 </p>
               </Card>
 
@@ -394,9 +403,9 @@ export default function DailyIdea() {
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10">
                   <span className="text-2xl">🚀</span>
                 </div>
-                <h3 className="text-white font-semibold mb-2">3. Livrează</h3>
+                <h3 className="text-white font-semibold mb-2">{t('daily.stepDeliver')}</h3>
                 <p className="text-sm text-slate-300/72">
-                  Postare completă gata de folosit în mai puțin de 30 secunde
+                  {t('daily.stepDeliverText')}
                 </p>
               </Card>
             </div>
@@ -411,13 +420,13 @@ export default function DailyIdea() {
               <span className="text-3xl">🎯</span>
             </div>
             <h2 className="mb-3 text-3xl font-bold text-white font-display">
-              Setează-ți nișa pentru idei mai bune.
+              {t('daily.nichePromptTitle')}
             </h2>
             <p className="mb-4 text-slate-300/78">
-              Ai generat deja 2 seturi generale cu AI. Dacă îți setezi nișa, următoarele idei vor fi mult mai specifice pentru clientul tău ideal.
+              {t('daily.nichePromptText')}
             </p>
             <p className="mb-6 text-sm text-slate-400">
-              Apasă pe buton, alege nișa și revino apoi aici.
+              {t('daily.nichePromptHint')}
             </p>
             <div className="flex flex-wrap gap-3">
               <Button
@@ -426,10 +435,10 @@ export default function DailyIdea() {
                   navigate('/niche-finder');
                 }}
               >
-                Setează-ți Nișa →
+                {t('daily.setNiche')} →
               </Button>
               <Button variant="outline" onClick={() => setShowNichePrompt(false)}>
-                Mai târziu
+                {t('daily.later')}
               </Button>
             </div>
           </Card>

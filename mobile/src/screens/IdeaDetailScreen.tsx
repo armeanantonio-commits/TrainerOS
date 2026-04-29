@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { colors } from '../constants/colors';
 import Card from '../components/Card';
 import { ideaAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 interface IdeaScene {
   scene?: number;
@@ -37,7 +38,7 @@ type RootStackParamList = {
   IdeaDetail: { id: string; ideas?: IdeaData[] };
 };
 
-const getHookText = (idea: IdeaData) => idea.hook || idea.title || 'Fără hook';
+const getHookText = (idea: IdeaData, fallback: string) => idea.hook || idea.title || fallback;
 
 const getDescriptionText = (idea: IdeaData) => {
   if (idea.description) return idea.description;
@@ -63,6 +64,7 @@ const normalizeScenes = (idea: IdeaData) => {
 
 export default function IdeaDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'IdeaDetail'>>();
+  const { language, t } = useI18n();
   const ideaId = route.params?.id;
   const routeIdeas = route.params?.ideas || [];
   const [activeFormat, setActiveFormat] = useState<string | null>(null);
@@ -102,9 +104,9 @@ export default function IdeaDetailScreen() {
     return (
       <View style={styles.container}>
         <Card style={styles.errorCard}>
-          <Text style={styles.errorTitle}>Idea not found</Text>
+          <Text style={styles.errorTitle}>{t('ideaDetail.notFound')}</Text>
           <Text style={styles.errorText}>
-            We could not load this idea. Please try again from History.
+            {t('ideaDetail.notFoundText')}
           </Text>
         </Card>
       </View>
@@ -123,9 +125,9 @@ export default function IdeaDetailScreen() {
     return (
       <View style={styles.container}>
         <Card style={styles.errorCard}>
-          <Text style={styles.errorTitle}>Idea not found</Text>
+          <Text style={styles.errorTitle}>{t('ideaDetail.notFound')}</Text>
           <Text style={styles.errorText}>
-            We could not load this idea. Please try again from History.
+            {t('ideaDetail.notFoundText')}
           </Text>
         </Card>
       </View>
@@ -162,25 +164,25 @@ export default function IdeaDetailScreen() {
           </Text>
           {selectedIdea?.createdAt ? (
             <Text style={styles.dateText}>
-              {new Date(selectedIdea.createdAt).toLocaleDateString()}
+              {new Date(selectedIdea.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'ro-RO')}
             </Text>
           ) : null}
         </View>
 
-        <Text style={styles.ideaTitle}>{getHookText(selectedIdea)}</Text>
+        <Text style={styles.ideaTitle}>{getHookText(selectedIdea, t('history.noHook'))}</Text>
         {getDescriptionText(selectedIdea) ? (
           <Text style={styles.ideaDescription}>{getDescriptionText(selectedIdea)}</Text>
         ) : null}
 
         {scenes.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Script Scenes</Text>
+            <Text style={styles.sectionTitle}>{t('ideaDetail.scriptScenes')}</Text>
             {scenes.map((scene, index) => (
               <View key={`${scene.sceneNumber}-${index}`} style={styles.sceneItem}>
-                <Text style={styles.sceneNumber}>Scene {scene.sceneNumber}</Text>
+                <Text style={styles.sceneNumber}>{t('ideaDetail.scene', { number: scene.sceneNumber })}</Text>
                 <Text style={styles.sceneText}>{scene.sceneText}</Text>
                 {scene.sceneVisual ? (
-                  <Text style={styles.sceneVisual}>Visual: {scene.sceneVisual}</Text>
+                  <Text style={styles.sceneVisual}>{t('ideaDetail.visual', { text: scene.sceneVisual })}</Text>
                 ) : null}
               </View>
             ))}
@@ -198,7 +200,7 @@ export default function IdeaDetailScreen() {
 
         {selectedIdea?.reasoning ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Why it works</Text>
+            <Text style={styles.sectionTitle}>{t('ideaDetail.reasoning')}</Text>
             <Text style={styles.reasoningText}>{selectedIdea.reasoning}</Text>
           </View>
         ) : null}

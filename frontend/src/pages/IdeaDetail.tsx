@@ -5,6 +5,7 @@ import api from '@/services/api';
 import Button from '@/components/Button';
 import Card from '@/components/Card';
 import IdeaCard from '@/components/IdeaCard';
+import { useI18n } from '@/hooks/useI18n';
 
 type FormatKey = 'reel' | 'carousel' | 'story';
 
@@ -18,6 +19,7 @@ function normalizeFormat(format?: string): FormatKey | null {
 export default function IdeaDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { language, t } = useI18n();
   const [activeTab, setActiveTab] = useState<FormatKey>('reel');
 
   const { data, isLoading, isError } = useQuery({
@@ -41,8 +43,8 @@ export default function IdeaDetail() {
         <div className="max-w-3xl mx-auto px-4">
           <Card className="text-center py-12">
             <div className="w-16 h-16 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">Se încarcă ideea...</h3>
-            <p className="text-gray-300">Un moment...</p>
+            <h3 className="text-xl font-bold text-white mb-2">{t('ideaDetail.loading')}</h3>
+            <p className="text-gray-300">{t('ideaDetail.wait')}</p>
           </Card>
         </div>
       </div>
@@ -57,16 +59,16 @@ export default function IdeaDetail() {
             <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-4xl">⚠️</span>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Ideea nu a fost găsită</h3>
+            <h3 className="text-xl font-bold text-white mb-2">{t('ideaDetail.notFound')}</h3>
             <p className="text-gray-300 mb-6">
-              Această idee nu mai există sau nu ai acces la ea.
+              {t('ideaDetail.notFoundText')}
             </p>
             <div className="flex gap-3 justify-center">
               <Button onClick={() => navigate(-1)} variant="outline">
-                ← Înapoi
+                ← {t('common.back')}
               </Button>
               <Link to="/daily-idea">
-                <Button>Generează Idee Nouă</Button>
+                <Button>{t('ideaDetail.generateNew')}</Button>
               </Link>
             </div>
           </Card>
@@ -143,7 +145,7 @@ export default function IdeaDetail() {
         {/* Header */}
         <div className="mb-6">
           <Button onClick={() => navigate(-1)} variant="outline" size="sm" className="mb-4">
-            ← Înapoi
+            ← {t('common.back')}
           </Button>
           <Card>
             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -152,9 +154,9 @@ export default function IdeaDetail() {
                   <span className="text-2xl">💡</span>
                 </div>
                 <div>
-                  <h3 className="text-white font-bold">Idee Generată</h3>
+                  <h3 className="text-white font-bold">{t('ideaDetail.generated')}</h3>
                   <p className="text-gray-400 text-sm">
-                    {new Date(activeIdea.createdAt).toLocaleDateString('ro-RO', {
+                    {new Date(activeIdea.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'ro-RO', {
                       weekday: 'long',
                       day: 'numeric',
                       month: 'long',
@@ -168,7 +170,7 @@ export default function IdeaDetail() {
                   {activeIdea.format}
                 </span>
                 {activeIdea.used && (
-                  <span className="text-xs text-brand-500 font-semibold">✓ Folosită</span>
+                  <span className="text-xs text-brand-500 font-semibold">{t('ideaDetail.used')}</span>
                 )}
               </div>
             </div>
@@ -182,12 +184,12 @@ export default function IdeaDetail() {
         <div className="mt-8 flex gap-4 justify-center">
           <Link to="/daily-idea">
             <Button variant="outline">
-              💡 Generează Altă Idee
+              {t('ideaDetail.generateAnother')}
             </Button>
           </Link>
           <Link to="/idea-history">
             <Button variant="outline">
-              📚 Vezi Istoric
+              {t('daily.viewHistory')}
             </Button>
           </Link>
         </div>

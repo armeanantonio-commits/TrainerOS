@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import type { User, Plan } from '@prisma/client';
 import crypto from 'crypto';
 import { sendActivationEmail, sendPasswordResetEmail } from './email.service.js';
+import { normalizeLanguage, type SupportedLanguage } from '../lib/language.js';
 
 const JWT_SECRET: Secret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const JWT_EXPIRES_IN = '7d'; // string literal for jwt.sign expiresIn
@@ -25,6 +26,7 @@ export interface LoginInput {
 export interface UpdateProfileInput {
   email?: string;
   name?: string;
+  preferredLanguage?: SupportedLanguage;
 }
 
 export interface AuthTokens {
@@ -35,6 +37,7 @@ export interface AuthTokens {
     name: string | null;
     plan: Plan;
     isAdmin: boolean;
+    preferredLanguage: SupportedLanguage;
   };
 }
 
@@ -138,6 +141,7 @@ export async function login(input: LoginInput): Promise<AuthTokens> {
       name: true,
       plan: true,
       isAdmin: true,
+      preferredLanguage: true,
     },
   });
 
@@ -157,6 +161,7 @@ export async function login(input: LoginInput): Promise<AuthTokens> {
       name: loggedInUser.name,
       plan: loggedInUser.plan,
       isAdmin: loggedInUser.isAdmin,
+      preferredLanguage: normalizeLanguage(loggedInUser.preferredLanguage),
     },
   };
 }
@@ -180,7 +185,7 @@ export async function verifyToken(token: string): Promise<User> {
 }
 
 export async function updateProfile(userId: string, input: UpdateProfileInput): Promise<User> {
-  const data: { email?: string; name?: string | null } = {};
+  const data: { email?: string; name?: string | null; preferredLanguage?: SupportedLanguage } = {};
 
   if (typeof input.email === 'string') {
     data.email = input.email.trim().toLowerCase();
@@ -189,6 +194,10 @@ export async function updateProfile(userId: string, input: UpdateProfileInput): 
   if (typeof input.name === 'string') {
     const trimmedName = input.name.trim();
     data.name = trimmedName.length > 0 ? trimmedName : null;
+  }
+
+  if (input.preferredLanguage) {
+    data.preferredLanguage = normalizeLanguage(input.preferredLanguage);
   }
 
   return prisma.user.update({

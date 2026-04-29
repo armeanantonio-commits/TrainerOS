@@ -3,6 +3,7 @@ import { createReadStream, readFileSync } from 'fs';
 import { GEMINI_MODEL, createGeminiPartsText, createGeminiText } from '../lib/gemini.js';
 import type { GenerationPromptContext } from '../lib/generation-history.js';
 import { buildAntiRepeatPromptSection } from '../lib/generation-history.js';
+import { buildAiLanguageInstruction, normalizeLanguage, type SupportedLanguage } from '../lib/language.js';
 
 let transcriptionClient: OpenAI | null = null;
 
@@ -277,6 +278,7 @@ async function parseModelJson<T>(content: string | null | undefined): Promise<T>
 
 export interface NicheFinderQuickInput {
   quickNiche: string;
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
@@ -299,6 +301,7 @@ export interface NicheQuickICPInput {
   primaryReason?: string;
   differentiation?: string;
   internalObjections?: string[];
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
@@ -308,6 +311,7 @@ export interface NicheFinderWizardInput {
   q3: string; // Ce rezultate poți demonstra?
   q4: string; // Ce tip de client vrei să eviți?
   q5: string; // De ce te-ar alege pe tine?
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
@@ -319,6 +323,23 @@ export interface NicheResult {
     niche: 'ai' | 'fallback';
     idealClient: 'ai' | 'fallback';
     positioning: 'ai' | 'fallback';
+  };
+  debug?: {
+    quickIcp?: {
+      firstResponsePreview: string;
+      retryResponsePreview?: string;
+      firstParsed: {
+        nicheLength: number;
+        idealClientLength: number;
+        positioningLength: number;
+      };
+      retryParsed?: {
+        nicheLength: number;
+        idealClientLength: number;
+        positioningLength: number;
+      };
+      missingCoreFieldsAfterFirstParse: boolean;
+    };
   };
 }
 
@@ -338,8 +359,276 @@ function joinHumanList(values: string[]): string {
   return `${values.slice(0, -1).join(', ')} și ${values[values.length - 1]}`;
 }
 
+function joinHumanListWithLanguage(values: string[], language: SupportedLanguage): string {
+  if (language !== 'en') {
+    return joinHumanList(values);
+  }
+
+  if (values.length === 0) {
+    return '';
+  }
+
+  if (values.length === 1) {
+    return values[0];
+  }
+
+  if (values.length === 2) {
+    return `${values[0]} and ${values[1]}`;
+  }
+
+  return `${values.slice(0, -1).join(', ')} and ${values[values.length - 1]}`;
+}
+
 function normalizeTextField(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function stripModelReasoningLeakage(value: string): string {
+  const text = normalizeTextField(value);
+  if (!text) {
+    return '';
+  }
+
+  const leakageMarkers = [
+    '\nTHOUGHT:',
+    ' THOUGHT:',
+    '\nThought:',
+    ' Thought:',
+    '\nThe user wants me',
+    ' The user wants me',
+    '\nI need to',
+    ' I need to',
+    '\nRules:',
+    '\nPARTIAL TEXT:',
+  ];
+
+  let cutIndex = -1;
+  for (const marker of leakageMarkers) {
+    const index = text.indexOf(marker);
+    if (index !== -1 && (cutIndex === -1 || index < cutIndex)) {
+      cutIndex = index;
+    }
+  }
+
+  return (cutIndex === -1 ? text : text.slice(0, cutIndex)).trim();
+}
+
+function isLikelyIncompleteGeneratedText(value: string, language: SupportedLanguage): boolean {
+  const text = stripModelReasoningLeakage(value);
+  if (!text) {
+    return true;
+  }
+
+  if (!/[.!?]"?$/.test(text)) {
+    return true;
+  }
+
+  const trailingFragmentPattern =
+    language === 'en'
+      ? /\b(and|or|with|for|to|of|in|who|that|which|but|yet|their|the|a|an)\s*["']?$/i
+      : /\b(și|sau|cu|pentru|de|din|în|pe|care|dar|iar|lor|un|o)\s*["']?$/i;
+
+  return trailingFragmentPattern.test(text);
+}
+
+function hasMinimumUsefulLength(value: string, field: 'idealClient' | 'positioning'): boolean {
+  const text = stripModelReasoningLeakage(value);
+  if (!text) {
+    return false;
+  }
+
+  if (field === 'idealClient') {
+    return text.length >= 260;
+  }
+
+  return text.length >= 90;
+}
+
+function isAcceptableQuickIcpFieldText(
+  value: string,
+  field: 'idealClient' | 'positioning',
+  language: SupportedLanguage
+): boolean {
+  return hasMinimumUsefulLength(value, field) && !isLikelyIncompleteGeneratedText(value, language);
+}
+
+function mergeContinuedText(baseText: string, continuation: string): string {
+  const base = stripModelReasoningLeakage(baseText);
+  const extra = stripModelReasoningLeakage(continuation)
+    .replace(/^["'`\s]+/, '')
+    .replace(/^(and|or|but|și|sau|dar)\b[\s,]*/i, (match) => match.trim().toLowerCase() + ' ');
+
+  if (!base) {
+    return extra;
+  }
+
+  if (!extra) {
+    return base;
+  }
+
+  return `${base}${/\s$/.test(base) ? '' : ' '}${extra}`.replace(/\s+/g, ' ').trim();
+}
+
+function normalizeClientBlockForLanguage(value: string, language: SupportedLanguage): string {
+  const normalized = normalizeTextField(value);
+  if (!normalized) {
+    return language === 'en' ? 'they do not have time for themselves' : 'nu au timp pentru ele';
+  }
+
+  if (language !== 'en') {
+    return normalized;
+  }
+
+  const lower = normalized.toLowerCase();
+  if (lower.includes('nu am timp')) return 'they do not have time for themselves';
+  if (lower.includes('nu sunt disciplin')) return 'they are not disciplined';
+  if (lower.includes('nu am voin')) return 'they do not have enough willpower';
+  if (lower.includes('ma las') || lower.includes('mă las')) return 'they always end up quitting';
+  if (lower.includes('nu sunt genul')) return 'they do not feel like the kind of person who succeeds at this';
+
+  return normalized;
+}
+
+function pickFirstTextField(source: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = normalizeTextField(source[key]);
+    if (value) return value;
+  }
+  return '';
+}
+
+function normalizeNicheResultAliases(raw: unknown): Partial<NicheResult> {
+  if (!raw || typeof raw !== 'object') {
+    return {};
+  }
+
+  const source = raw as Record<string, unknown>;
+  return {
+    niche: pickFirstTextField(source, ['niche', 'nisa', 'nișa', 'variant', 'titluNisa', 'titluNișa']),
+    idealClient: pickFirstTextField(source, [
+      'idealClient',
+      'clientIdeal',
+      'profilClient',
+      'profilClientIdeal',
+      'avatarClient',
+    ]),
+    positioning: pickFirstTextField(source, [
+      'positioning',
+      'pozitionare',
+      'poziționare',
+      'mesajPozitionare',
+      'mesajPoziționare',
+    ]),
+  };
+}
+
+async function generateQuickIcpFieldText(args: {
+  field: 'idealClient' | 'positioning';
+  niche: string;
+  input: NicheQuickICPInput;
+  language: SupportedLanguage;
+  languageInstruction: string;
+  strictLanguageReminder: string;
+}): Promise<string> {
+  const { field, niche, input, languageInstruction, strictLanguageReminder } = args;
+  const fieldPrompt =
+    field === 'idealClient'
+      ? `Scrie DOAR profilul clientului ideal pentru nișa ${JSON.stringify(niche)}.
+
+Cerințe:
+- 2 paragrafe compacte, 90-140 cuvinte total
+- fără bullet points
+- include demografic, rutină, obstacole, motivații și context real
+- text natural, complet și specific`
+      : `Scrie DOAR mesajul de poziționare pentru nișa ${JSON.stringify(niche)}.
+
+Cerințe:
+- 2-3 propoziții, 35-70 cuvinte total
+- clar, specific, fără formulări vagi
+- explică pentru cine este și de ce abordarea antrenorului este diferită`;
+
+  const prompt = `Tu ești un expert în marketing fitness.
+
+${languageInstruction}
+${strictLanguageReminder ? `\n${strictLanguageReminder}` : ''}
+
+${fieldPrompt}
+
+CONTEXT:
+👥 Gen: ${input.gender}
+🎯 Vârstă: ${input.ageRanges.join(', ')}${input.customAgeRange ? ` + ${input.customAgeRange}` : ''}
+⏰ Trezire: ${input.wakeUpTime || 'N/A'}
+💼 Job: ${input.jobType || 'N/A'}
+🪑 Timp șezând: ${input.sittingTime || 'N/A'}
+🌅 Dimineața: ${input.morning?.join(', ') || 'N/A'}
+🍽️ Prânz: ${input.lunch?.join(', ') || 'N/A'}
+🌙 Seara: ${input.evening?.join(', ') || 'N/A'}
+⭐ Situații: ${input.definingSituations?.join(', ') || 'N/A'}
+🟦 Diferențiere: ${input.differentiation || 'N/A'}
+⚠️ Obiecții interne: ${input.internalObjections?.join(', ') || 'N/A'}
+
+Răspunde DOAR cu textul final, fără JSON, fără markdown, fără titlu de secțiune.`;
+
+  const maxTokens = field === 'idealClient' ? 900 : 400;
+  let content = stripModelReasoningLeakage(normalizeTextField(await generateGeminiText(prompt, 0.45, maxTokens)));
+
+  if (isLikelyIncompleteGeneratedText(content, args.language)) {
+    const continuationPrompt = `Continue and finish this text naturally in the same language and tone.
+
+Rules:
+- Return ONLY the missing continuation, not the full text again.
+- Start with the next word directly.
+- Finish the thought completely.
+- End with a proper sentence ending.
+
+PARTIAL TEXT:
+${JSON.stringify(content)}`;
+    const continuation = stripModelReasoningLeakage(normalizeTextField(
+      await generateGeminiText(continuationPrompt, 0.3, Math.max(180, Math.floor(maxTokens / 2)))
+    ));
+    content = mergeContinuedText(content, continuation);
+  }
+
+  if (isLikelyIncompleteGeneratedText(content, args.language)) {
+    const completionPrompt = `${prompt}
+
+IMPORTANT:
+- Textul trebuie să fie complet.
+- Ultima propoziție trebuie terminată corect.
+- Nu te opri în mijlocul unei idei.
+- Răspunde doar cu varianta finală completă.`;
+    content = stripModelReasoningLeakage(normalizeTextField(await generateGeminiText(completionPrompt, 0.35, maxTokens)));
+  }
+
+  if (isLikelyIncompleteGeneratedText(content, args.language)) {
+    const finalContinuationPrompt = `Finish this partial text with one short, complete continuation.
+
+Rules:
+- Return ONLY the continuation.
+- Do not restart the text.
+- Close the final sentence properly.
+
+PARTIAL TEXT:
+${JSON.stringify(content)}`;
+    const finalContinuation = stripModelReasoningLeakage(normalizeTextField(
+      await generateGeminiText(finalContinuationPrompt, 0.2, field === 'idealClient' ? 220 : 120)
+    ));
+    content = mergeContinuedText(content, finalContinuation);
+  }
+
+  if (!isAcceptableQuickIcpFieldText(content, field, args.language)) {
+    const strictRewritePrompt = `${prompt}
+
+IMPORTANT FINAL RULES:
+- Return a COMPLETE final answer, not a draft.
+- Do not stop in the middle of a sentence.
+- Respect the requested length fully.
+- If the answer is too short, expand it before stopping.
+- Return only the final text.`;
+    content = stripModelReasoningLeakage(normalizeTextField(await generateGeminiText(strictRewritePrompt, 0.3, maxTokens + 200)));
+  }
+
+  return content;
 }
 
 function normalizeGenderForNiche(gender: string): string {
@@ -360,7 +649,27 @@ function normalizeAgeForNiche(input: NicheQuickICPInput): string {
     .join(', ');
 }
 
-function buildQuickIcpFallbackNiche(input: NicheQuickICPInput): string {
+function buildQuickIcpFallbackNiche(input: NicheQuickICPInput, language: SupportedLanguage): string {
+  if (language === 'en') {
+    const reasons = [
+      ...(input.primaryReason ? [input.primaryReason] : []),
+      ...((input.mainReasons || []).filter((reason) => reason !== input.primaryReason)),
+    ];
+    const transformedReasons = reasons.slice(0, 2).map((reason) => {
+      if (reason === 'Slăbit') return 'lose fat';
+      if (reason === 'Tonifiere / estetic') return 'tone up';
+      if (reason === 'Energie / stare generală') return 'have more energy';
+      if (reason === 'Disciplină / consecvență') return 'be more consistent';
+      if (reason === 'Dureri / disconfort') return 'reduce discomfort';
+      return reason.toLowerCase();
+    });
+    const outcome =
+      transformedReasons.length > 0
+        ? `who want to ${joinHumanListWithLanguage(transformedReasons, language)}`
+        : 'who want sustainable results';
+    return `Personalized and flexible training for people with active schedules ${outcome}.`;
+  }
+
   const normalizedGender = normalizeGenderForNiche(input.gender);
   const normalizedAge = normalizeAgeForNiche(input);
   const audienceParts: string[] = [];
@@ -420,7 +729,41 @@ function buildQuickIcpFallbackNiche(input: NicheQuickICPInput): string {
   return `Antrenament personalizat și flexibil pentru ${audienceParts.join(' ').replace(/\s+/g, ' ').trim()} ${outcome}.`;
 }
 
-function buildQuickIcpContextSummary(input: NicheQuickICPInput): string {
+function buildQuickIcpContextSummary(input: NicheQuickICPInput, language: SupportedLanguage): string {
+  if (language === 'en') {
+    const parts: string[] = [];
+    const normalizedAge = normalizeAgeForNiche(input);
+    if (input.gender === 'barbati') {
+      parts.push(normalizedAge ? `men aged ${normalizedAge}` : 'men');
+    } else if (input.gender === 'femei') {
+      parts.push(normalizedAge ? `women aged ${normalizedAge}` : 'women');
+    } else {
+      parts.push(normalizedAge ? `people aged ${normalizedAge}` : 'people');
+    }
+
+    if (input.jobType === 'activ') {
+      parts.push('with an active work rhythm');
+    } else if (input.jobType === 'sedentar') {
+      parts.push('with mostly sedentary jobs');
+    } else if (input.jobType === 'mixt') {
+      parts.push('with a mixed work schedule');
+    }
+
+    if (input.definingSituations?.includes('Sunt deja activi / merg la sală')) {
+      parts.push('who already go to the gym');
+    }
+
+    if (input.definingSituations?.includes('Au un job foarte solicitant fizic')) {
+      parts.push('and physically demanding jobs');
+    }
+
+    if (input.definingSituations?.includes('Lucrează în ture / program neregulat')) {
+      parts.push('with irregular shifts');
+    }
+
+    return joinHumanListWithLanguage(parts.filter(Boolean), language);
+  }
+
   const parts: string[] = [];
   const normalizedGender = normalizeGenderForNiche(input.gender);
   const normalizedAge = normalizeAgeForNiche(input);
@@ -456,12 +799,21 @@ function buildQuickIcpContextSummary(input: NicheQuickICPInput): string {
   return joinHumanList(parts.filter(Boolean));
 }
 
-function buildQuickIcpNeedSummary(input: NicheQuickICPInput): string {
+function buildQuickIcpNeedSummary(input: NicheQuickICPInput, language: SupportedLanguage): string {
   const reasons = [
     ...(input.primaryReason ? [input.primaryReason] : []),
     ...((input.mainReasons || []).filter((reason) => reason !== input.primaryReason)),
   ];
   const transformedReasons = reasons.slice(0, 2).map((reason) => {
+    if (language === 'en') {
+      if (reason === 'Slăbit') return 'lose fat';
+      if (reason === 'Tonifiere / estetic') return 'tone up';
+      if (reason === 'Energie / stare generală') return 'have more energy';
+      if (reason === 'Disciplină / consecvență') return 'be more consistent';
+      if (reason === 'Dureri / disconfort') return 'reduce discomfort';
+      return reason.toLowerCase();
+    }
+
     if (reason === 'Slăbit') {
       return 'să slăbească';
     }
@@ -482,15 +834,29 @@ function buildQuickIcpNeedSummary(input: NicheQuickICPInput): string {
   });
 
   if (transformedReasons.length === 0) {
+    if (language === 'en') {
+      return 'need clear structure, consistency, and sustainable results';
+    }
     return 'au nevoie de structură clară, consecvență și rezultate sustenabile';
   }
 
+  if (language === 'en') {
+    return `want to ${joinHumanListWithLanguage(transformedReasons, language)}`;
+  }
   return `vor ${joinHumanList(transformedReasons)}`;
 }
 
-function buildQuickIcpFallbackIdealClient(input: NicheQuickICPInput, niche: string): string {
-  const audience = buildQuickIcpContextSummary(input);
-  const needSummary = buildQuickIcpNeedSummary(input);
+function buildQuickIcpFallbackIdealClient(input: NicheQuickICPInput, niche: string, language: SupportedLanguage): string {
+  const audience = buildQuickIcpContextSummary(input, language);
+  const needSummary = buildQuickIcpNeedSummary(input, language);
+
+  if (language === 'en') {
+    return [
+      `You work with ${audience || `people who clearly fit the niche "${niche}"`}.`,
+      'They need a clear, realistic, easy-to-follow plan that fits their schedule, without complicated recommendations they cannot sustain.',
+      `Most of the time they ${needSummary}, but they struggle with lack of structure, fatigue, or inconsistency. They respond well to practical, clearly explained steps and to a process that shows visible progress.`,
+    ].join('\n\n');
+  }
 
   return [
     `Lucrezi cu ${audience || `oameni potriviți pentru nișa "${niche}"`}.`,
@@ -499,8 +865,16 @@ function buildQuickIcpFallbackIdealClient(input: NicheQuickICPInput, niche: stri
   ].join('\n\n');
 }
 
-function buildQuickIcpFallbackPositioning(input: NicheQuickICPInput, niche: string): string {
-  const needSummary = buildQuickIcpNeedSummary(input);
+function buildQuickIcpFallbackPositioning(input: NicheQuickICPInput, niche: string, language: SupportedLanguage): string {
+  const needSummary = buildQuickIcpNeedSummary(input, language);
+
+  if (language === 'en') {
+    return [
+      `You are the coach who turns the niche "${niche}" into a clear and actionable process.`,
+      'You do not sell generic advice. You provide structure, adaptation to real schedules, and a plan that helps people get results without making fitness feel more complicated.',
+      `Core message: for people who ${needSummary}, you make the process simpler, clearer, and easier to follow.`,
+    ].join('\n\n');
+  }
 
   return [
     `Tu ești antrenorul care transformă nișa "${niche}" într-un proces clar și aplicabil.`,
@@ -523,61 +897,90 @@ function seemsIncompleteNiche(value: string): boolean {
   return /\b(și|sau|cu|pentru|din|de|la|în|pe|program|joburi?)\.?$/i.test(normalized);
 }
 
-function buildDiscoverAudienceSummary(input: NicheDiscoverInput): string {
+function buildDiscoverAudienceSummary(input: NicheDiscoverInput, language: SupportedLanguage): string {
   const audience =
     input.gender === 'femei'
-      ? 'femei'
+      ? language === 'en' ? 'women' : 'femei'
       : input.gender === 'barbati'
-        ? 'bărbați'
-        : 'persoane';
+        ? language === 'en' ? 'men' : 'bărbați'
+        : language === 'en' ? 'people' : 'persoane';
   const ages = input.ageRanges.length ? input.ageRanges.join(', ') : '';
   const parts = [ages ? `${audience} ${ages}` : audience];
 
   if (input.selectedNiche.toLowerCase().includes('program aglomerat')) {
-    parts.push('cu program aglomerat');
+    parts.push(language === 'en' ? 'with a busy schedule' : 'cu program aglomerat');
   } else if (input.definingSituations?.includes('Lucrează în ture / program neregulat')) {
-    parts.push('cu program neregulat');
+    parts.push(language === 'en' ? 'with an irregular schedule' : 'cu program neregulat');
   }
 
   if (input.jobType === 'activ') {
-    parts.push('și ritm activ de lucru');
+    parts.push(language === 'en' ? 'with a physically active work rhythm' : 'și ritm activ de lucru');
   } else if (input.jobType === 'sedentar') {
-    parts.push('și muncă mai mult sedentară');
+    parts.push(language === 'en' ? 'with mostly sedentary work' : 'și muncă mai mult sedentară');
   }
 
   return parts.join(' ');
 }
 
-function buildDiscoverGoalSummary(input: NicheDiscoverInput): string {
+function buildDiscoverGoalSummary(input: NicheDiscoverInput, language: SupportedLanguage): string {
   const goal = normalizeTextField(input.primaryGoal) || normalizeTextField(input.primaryOutcome);
+  if (language === 'en') {
+    const lower = goal.toLowerCase();
+    if (!goal) return 'get better results in a realistic, sustainable way';
+    if (lower.includes('slăb') || lower.includes('slab')) return 'lose fat sustainably';
+    if (lower.includes('tonifi')) return 'tone up without extremes';
+    if (lower.includes('energie')) return 'have more energy and control';
+    if (lower.includes('durer') || lower.includes('disconfort')) return 'reduce pain and discomfort';
+    if (lower.includes('disciplin') || lower.includes('consecven')) return 'be more consistent';
+    return goal;
+  }
   return normalizeOutcomeForSentence(goal);
 }
 
-function buildDiscoverFallbackNiche(input: NicheDiscoverInput): string {
+function buildDiscoverFallbackNiche(input: NicheDiscoverInput, language: SupportedLanguage): string {
   const selected = normalizeTextField(input.selectedNiche);
-  const audience = buildDiscoverAudienceSummary(input);
-  const goal = buildDiscoverGoalSummary(input);
+  const audience = buildDiscoverAudienceSummary(input, language);
+  const goal = buildDiscoverGoalSummary(input, language);
 
   if (!selected) {
-    return `Fitness sustenabil pentru ${audience} care vor ${goal}.`;
+    return language === 'en'
+      ? `Sustainable fitness for ${audience} who want to ${goal}.`
+      : `Fitness sustenabil pentru ${audience} care vor ${goal}.`;
   }
 
   if (/pentru/i.test(selected)) {
-    return `${selected} care vor ${goal}.`;
+    return language === 'en'
+      ? `${selected} for people who want to ${goal}.`
+      : `${selected} care vor ${goal}.`;
   }
 
-  return `${selected} pentru ${audience} care vor ${goal}.`;
+  return language === 'en'
+    ? `${selected} for ${audience} who want to ${goal}.`
+    : `${selected} pentru ${audience} care vor ${goal}.`;
 }
 
-function buildDiscoverFallbackIdealClient(input: NicheDiscoverInput, niche: string): string {
-  const audience = buildDiscoverAudienceSummary(input);
-  const problem = normalizeProblemForSentence(input.commonProblems[0] || 'lipsa de claritate și consecvență');
-  const block = normalizeTextField(input.clientStatement) || 'simt că nu au timp pentru ele';
-  const goal = buildDiscoverGoalSummary(input);
+function buildDiscoverFallbackIdealClient(input: NicheDiscoverInput, niche: string, language: SupportedLanguage): string {
+  const audience = buildDiscoverAudienceSummary(input, language);
+  const problem = normalizeProblemForSentence(input.commonProblems[0] || 'lipsa de claritate și consecvență', language);
+  const block = normalizeClientBlockForLanguage(input.clientStatement, language);
+  const goal = buildDiscoverGoalSummary(input, language);
   const routine =
     input.wakeUpTime || input.jobType || input.sittingTime
-      ? `Ziua lor începe ${input.wakeUpTime ? `devreme, în jur de ${input.wakeUpTime}` : 'repede'}, continuă cu ${input.jobType ? `un program ${input.jobType}` : 'un program plin'} și le lasă puțin spațiu pentru ele la finalul zilei.`
-      : 'Au un program care le consumă energia și le face greu să rămână constante.';
+      ? language === 'en'
+        ? `Their day starts ${input.wakeUpTime ? `early, around ${input.wakeUpTime}` : 'early'}, continues with ${input.jobType ? `a ${input.jobType} work routine` : 'a packed schedule'}, and leaves very little room for themselves by the end of the day.`
+        : `Ziua lor începe ${input.wakeUpTime ? `devreme, în jur de ${input.wakeUpTime}` : 'repede'}, continuă cu ${input.jobType ? `un program ${input.jobType}` : 'un program plin'} și le lasă puțin spațiu pentru ele la finalul zilei.`
+      : language === 'en'
+        ? 'They have a schedule that drains their energy and makes consistency hard to maintain.'
+        : 'Au un program care le consumă energia și le face greu să rămână constante.';
+
+  if (language === 'en') {
+    return [
+      `You work with ${audience}, a strong fit for the niche "${niche}". They are not looking for extremes, but for a clear system that helps them stay consistent and get real results.`,
+      routine,
+      `Their main problem is ${problem}, but underneath that sits the deeper block: ${block}. They often know what they should do, yet they struggle to turn intention into a simple plan they can actually repeat.`,
+      `What they really want is to ${goal}, feel more in control, and believe they can take care of themselves without turning the rest of their life upside down. They respond to simple, practical messaging and examples that feel realistic in their actual context.`,
+    ].join('\n\n');
+  }
 
   return [
     `Lucrezi cu ${audience}, potriviți pentru nișa "${niche}". Nu caută extreme, ci un sistem clar care să le ajute să rămână constante și să obțină rezultate reale.`,
@@ -587,9 +990,17 @@ function buildDiscoverFallbackIdealClient(input: NicheDiscoverInput, niche: stri
   ].join('\n\n');
 }
 
-function buildDiscoverFallbackPositioning(input: NicheDiscoverInput, niche: string): string {
-  const goal = buildDiscoverGoalSummary(input);
-  const block = normalizeTextField(input.clientStatement) || 'nu au timp pentru ele';
+function buildDiscoverFallbackPositioning(input: NicheDiscoverInput, niche: string, language: SupportedLanguage): string {
+  const goal = buildDiscoverGoalSummary(input, language);
+  const block = normalizeClientBlockForLanguage(input.clientStatement, language);
+
+  if (language === 'en') {
+    return [
+      `You position the niche "${niche}" as a clear solution for people who want to ${goal}, but feel that ${block}.`,
+      `You do not promise extreme changes or sell pressure. Your message is about structure, adaptation to real life, and practical steps people can follow consistently.`,
+      `Your differentiator: you make fitness easier to understand, easier to apply, and easier to sustain over the long term.`,
+    ].join('\n\n');
+  }
 
   return [
     `Tu poziționezi nișa "${niche}" ca o soluție clară pentru oamenii care vor ${goal}, dar simt că ${block}.`,
@@ -601,23 +1012,30 @@ function buildDiscoverFallbackPositioning(input: NicheDiscoverInput, niche: stri
 function ensureCompleteNicheResult(
   partial: Partial<NicheResult>,
   contextHint: string,
-  fallbackNiche = 'Nișă fitness personalizată',
+  language: SupportedLanguage = 'ro',
+  fallbackNiche = getLocalizedNicheUi(language).customFitnessNiche,
   fallbackIdealClient?: string,
   fallbackPositioning?: string
 ): NicheResult {
-  const parsedNiche = normalizeTextField(partial.niche);
-  const parsedIdealClient = normalizeTextField(partial.idealClient);
-  const parsedPositioning = normalizeTextField(partial.positioning);
+  const parsedNiche = stripModelReasoningLeakage(normalizeTextField(partial.niche));
+  const parsedIdealClient = stripModelReasoningLeakage(normalizeTextField(partial.idealClient));
+  const parsedPositioning = stripModelReasoningLeakage(normalizeTextField(partial.positioning));
+  const idealClientIsUsable = isAcceptableQuickIcpFieldText(parsedIdealClient, 'idealClient', language);
+  const positioningIsUsable = isAcceptableQuickIcpFieldText(parsedPositioning, 'positioning', language);
 
   const niche = seemsIncompleteNiche(parsedNiche) ? fallbackNiche : parsedNiche;
   const idealClient =
-    parsedIdealClient ||
+    (idealClientIsUsable ? parsedIdealClient : '') ||
     fallbackIdealClient ||
-    `Clientul ideal pentru "${niche}" este persoana care se regăsește clar în contextul descris: ${contextHint}. Are nevoie de o soluție aplicabilă, realistă și adaptată stilului ei de viață, nu de sfaturi generale. Caută claritate, progres vizibil și un plan care să poată fi urmat consecvent fără să-i complice și mai mult programul.`;
+    (language === 'en'
+      ? `The ideal client for "${niche}" clearly fits this context: ${contextHint}. They need a realistic, practical solution that fits their lifestyle, not generic advice. They are looking for clarity, visible progress, and a plan they can follow consistently without making their schedule even harder.`
+      : `Clientul ideal pentru "${niche}" este persoana care se regăsește clar în contextul descris: ${contextHint}. Are nevoie de o soluție aplicabilă, realistă și adaptată stilului ei de viață, nu de sfaturi generale. Caută claritate, progres vizibil și un plan care să poată fi urmat consecvent fără să-i complice și mai mult programul.`);
   const positioning =
-    parsedPositioning ||
+    (positioningIsUsable ? parsedPositioning : '') ||
     fallbackPositioning ||
-    `Ajut persoanele din nișa "${niche}" să obțină rezultate reale printr-o abordare clară, adaptată contextului lor zilnic și nevoilor lor reale. Focusul nu este pe recomandări generale, ci pe pași practici care pot fi aplicați consecvent și care duc la progres vizibil.`;
+    (language === 'en'
+      ? `I help people in the "${niche}" niche get real results through a clear approach adapted to their daily context and real needs. The focus is not on generic advice, but on practical steps they can apply consistently to create visible progress.`
+      : `Ajut persoanele din nișa "${niche}" să obțină rezultate reale printr-o abordare clară, adaptată contextului lor zilnic și nevoilor lor reale. Focusul nu este pe recomandări generale, ci pe pași practici care pot fi aplicați consecvent și care duc la progres vizibil.`);
 
   return {
     niche,
@@ -625,14 +1043,24 @@ function ensureCompleteNicheResult(
     positioning,
     sources: {
       niche: parsedNiche && !seemsIncompleteNiche(parsedNiche) ? 'ai' : 'fallback',
-      idealClient: parsedIdealClient ? 'ai' : 'fallback',
-      positioning: parsedPositioning ? 'ai' : 'fallback',
+      idealClient: idealClientIsUsable ? 'ai' : 'fallback',
+      positioning: positioningIsUsable ? 'ai' : 'fallback',
     },
   };
 }
 
 export async function generateNicheQuick(input: NicheFinderQuickInput): Promise<NicheResult> {
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const language = normalizeLanguage(input.language);
+  const languageInstruction = buildAiLanguageInstruction(language);
+  const strictLanguageReminder =
+    language === 'en'
+      ? [
+          'CRITICAL LANGUAGE RULE:',
+          '- The final values for "niche", "idealClient", and "positioning" must be in English only.',
+          '- Do not answer in Romanian.',
+        ].join('\n')
+      : '';
   const prompt = `Tu ești un expert în marketing fitness. Analizează această nișă și creează:
 
 1. Nișa clară și specifică (1 propoziție precisă)
@@ -640,6 +1068,9 @@ export async function generateNicheQuick(input: NicheFinderQuickInput): Promise<
 3. Mesaj de poziționare (1-2 propoziții, unique value proposition)
 
 Nișa introdusă: "${input.quickNiche}"
+
+${languageInstruction}
+${strictLanguageReminder ? `\n\n${strictLanguageReminder}` : ''}
 
 ${antiRepeatSection}
 
@@ -658,16 +1089,27 @@ FORMAT:
 
   const content = await generateGeminiJson(prompt, 0.7, 500);
   const parsed = await parseModelJson<Partial<NicheResult>>(content);
-  return ensureCompleteNicheResult(parsed, input.quickNiche);
+  return ensureCompleteNicheResult(parsed, input.quickNiche, language);
 }
 
 export async function generateNicheQuickICP(input: NicheQuickICPInput): Promise<NicheResult> {
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const normalizedLanguage = normalizeLanguage(input.language);
+  const languageInstruction = buildAiLanguageInstruction(normalizedLanguage);
+  const strictLanguageReminder =
+    normalizedLanguage === 'en'
+      ? [
+          'CRITICAL LANGUAGE RULE:',
+          '- The final values for "niche", "idealClient", and "positioning" must be in English only.',
+          '- The profile context below may be written in Romanian, but that does not change the output language.',
+          '- Do not answer in Romanian.',
+        ].join('\n')
+      : '';
   const prompt = `Tu ești un expert în marketing fitness. Pe baza descrierii clientului ideal, creează:
 
 1. Nișa clară și specifică (1 propoziție precisă)
-2. Profilul clientului ideal DETALIAT (demografic + psihografic + rutina zilnică + pain points, 4-5 paragrafe)
-3. Mesaj de poziționare (1-2 propoziții, unique value proposition)
+2. Profilul clientului ideal DETALIAT (demografic + psihografic + rutina zilnică + pain points, 2 paragrafe consistente)
+3. Mesaj de poziționare (2-3 propoziții, unique value proposition)
 
 PROFILUL CLIENTULUI IDEAL:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -691,14 +1133,22 @@ ${input.painDetails?.length ? `\n🩹 Dureri/limitări: ${input.painDetails.join
 ${input.differentiation ? `\n🟦 Diferențiere antrenor: ${input.differentiation}` : ''}
 ${input.internalObjections?.length ? `\n⚠️ Obiecții interne: ${input.internalObjections.join(', ')}` : ''}
 
+${languageInstruction}
+${strictLanguageReminder ? `\n\n${strictLanguageReminder}` : ''}
+
 ${antiRepeatSection}
 
-IMPORTANT: Pentru "idealClient", scrie un profil COMPLET (4-5 paragrafe) care combină:
+IMPORTANT: Pentru "idealClient", scrie un profil COMPLET și compact (2 paragrafe) care combină:
 - Demografic (gen, vârstă)
 - Rutina zilnică (job, program, mese, energie)
 - Pain points și obstacole
 - Situații definitorii și cum le afectează viața
 - Obiecții interne dominante și cum îi țin pe loc
+
+IMPORTANT DE LUNGIME:
+- "idealClient" trebuie să aibă 90-140 cuvinte.
+- "positioning" trebuie să aibă 35-70 cuvinte.
+- Păstrează răspunsul complet, dar suficient de compact încât să încapă integral în JSON.
 
 Răspunde DOAR în format JSON strict, fără markdown.
 IMPORTANT:
@@ -709,12 +1159,120 @@ IMPORTANT:
 FORMAT:
 {
   "niche": "Nișa ta specifică aici",
-  "idealClient": "Profilul DETALIAT al clientului ideal (4-5 paragrafe în proză, nu bullet points)",
+  "idealClient": "Profilul DETALIAT al clientului ideal (2 paragrafe în proză, nu bullet points)",
   "positioning": "Mesajul tău de poziționare unic"
 }`;
 
-  const content = await generateGeminiJson(prompt, 0.7, 900);
-  const parsed = await parseModelJson<Partial<NicheResult>>(content);
+  const content = await generateGeminiJson(prompt, 0.7, 1600);
+  let parsed = normalizeNicheResultAliases(await parseModelJson<Partial<NicheResult>>(content));
+  const quickIcpDebug: NonNullable<NonNullable<NicheResult['debug']>['quickIcp']> = {
+    firstResponsePreview: previewModelResponse(content, 500),
+    firstParsed: {
+      nicheLength: normalizeTextField(parsed.niche).length,
+      idealClientLength: normalizeTextField(parsed.idealClient).length,
+      positioningLength: normalizeTextField(parsed.positioning).length,
+    },
+    missingCoreFieldsAfterFirstParse: false,
+  };
+
+  const missingCoreFields =
+    !normalizeTextField(parsed.idealClient) ||
+    !normalizeTextField(parsed.positioning) ||
+    isLikelyIncompleteGeneratedText(normalizeTextField(parsed.idealClient), normalizedLanguage) ||
+    isLikelyIncompleteGeneratedText(normalizeTextField(parsed.positioning), normalizedLanguage);
+  quickIcpDebug.missingCoreFieldsAfterFirstParse = missingCoreFields;
+  if (missingCoreFields) {
+    const nicheForFollowUp =
+      normalizeTextField(parsed.niche) || buildQuickIcpFallbackNiche(input, normalizedLanguage);
+    const retryPrompt = `Tu completezi un răspuns JSON pentru un fitness coach.
+
+Ai deja nișa finală:
+- niche: ${JSON.stringify(nicheForFollowUp)}
+
+Generează DOAR câmpurile lipsă de mai jos, pe baza aceluiași context:
+- "idealClient": 2 paragrafe în proză, 90-140 cuvinte total
+- "positioning": 2-3 propoziții, 35-70 cuvinte total
+
+CONTEXT:
+👥 Gen: ${input.gender}
+🎯 Vârstă: ${input.ageRanges.join(', ')}${input.customAgeRange ? ` + ${input.customAgeRange}` : ''}
+⏰ Trezire: ${input.wakeUpTime || 'N/A'}
+💼 Job: ${input.jobType || 'N/A'}
+🪑 Timp șezând: ${input.sittingTime || 'N/A'}
+🌅 Dimineața: ${input.morning?.join(', ') || 'N/A'}
+🍽️ Prânz: ${input.lunch?.join(', ') || 'N/A'}
+🌙 Seara: ${input.evening?.join(', ') || 'N/A'}
+⭐ Situații: ${input.definingSituations?.join(', ') || 'N/A'}
+🟦 Diferențiere: ${input.differentiation || 'N/A'}
+⚠️ Obiecții interne: ${input.internalObjections?.join(', ') || 'N/A'}
+
+${languageInstruction}
+${strictLanguageReminder ? `\n\n${strictLanguageReminder}` : ''}
+
+RETRY RULES:
+- Return strict JSON only.
+- Both fields are mandatory and non-empty.
+- Do not return the "niche" field again.
+- Do not use bullet points.
+
+FORMAT:
+{
+  "idealClient": "string",
+  "positioning": "string"
+}`;
+    const retryContent = await generateGeminiJson(retryPrompt, 0.4, 1400);
+    const retryParsed = normalizeNicheResultAliases(await parseModelJson<Partial<NicheResult>>(retryContent));
+    quickIcpDebug.retryResponsePreview = previewModelResponse(retryContent, 500);
+    quickIcpDebug.retryParsed = {
+      nicheLength: normalizeTextField(retryParsed.niche).length,
+      idealClientLength: normalizeTextField(retryParsed.idealClient).length,
+      positioningLength: normalizeTextField(retryParsed.positioning).length,
+    };
+    parsed = {
+      ...parsed,
+      niche: normalizeTextField(retryParsed.niche) || parsed.niche,
+      idealClient: normalizeTextField(retryParsed.idealClient) || parsed.idealClient,
+      positioning: normalizeTextField(retryParsed.positioning) || parsed.positioning,
+    };
+  }
+  const nicheForFollowUp =
+    normalizeTextField(parsed.niche) || buildQuickIcpFallbackNiche(input, normalizedLanguage);
+  if (isLikelyIncompleteGeneratedText(normalizeTextField(parsed.idealClient), normalizedLanguage)) {
+    const generatedIdealClient = await generateQuickIcpFieldText({
+      field: 'idealClient',
+      niche: nicheForFollowUp,
+      input,
+      language: normalizedLanguage,
+      languageInstruction,
+      strictLanguageReminder,
+    });
+    if (generatedIdealClient) {
+      parsed.idealClient = generatedIdealClient;
+      quickIcpDebug.retryParsed = {
+        nicheLength: normalizeTextField(parsed.niche).length,
+        idealClientLength: normalizeTextField(parsed.idealClient).length,
+        positioningLength: normalizeTextField(parsed.positioning).length,
+      };
+    }
+  }
+  if (isLikelyIncompleteGeneratedText(normalizeTextField(parsed.positioning), normalizedLanguage)) {
+    const generatedPositioning = await generateQuickIcpFieldText({
+      field: 'positioning',
+      niche: nicheForFollowUp,
+      input,
+      language: normalizedLanguage,
+      languageInstruction,
+      strictLanguageReminder,
+    });
+    if (generatedPositioning) {
+      parsed.positioning = generatedPositioning;
+      quickIcpDebug.retryParsed = {
+        nicheLength: normalizeTextField(parsed.niche).length,
+        idealClientLength: normalizeTextField(parsed.idealClient).length,
+        positioningLength: normalizeTextField(parsed.positioning).length,
+      };
+    }
+  }
   const contextHint = [
     `gen ${input.gender}`,
     `vârste ${input.ageRanges.join(', ')}${input.customAgeRange ? `, plus ${input.customAgeRange}` : ''}`,
@@ -725,18 +1283,23 @@ FORMAT:
   ]
     .filter(Boolean)
     .join('; ');
-  const fallbackNiche = buildQuickIcpFallbackNiche(input);
-  return ensureCompleteNicheResult(
+  const fallbackNiche = buildQuickIcpFallbackNiche(input, normalizedLanguage);
+  const result = ensureCompleteNicheResult(
     parsed,
     contextHint,
+    normalizedLanguage,
     fallbackNiche,
-    buildQuickIcpFallbackIdealClient(input, fallbackNiche),
-    buildQuickIcpFallbackPositioning(input, fallbackNiche)
+    buildQuickIcpFallbackIdealClient(input, fallbackNiche, normalizedLanguage),
+    buildQuickIcpFallbackPositioning(input, fallbackNiche, normalizedLanguage)
   );
+  result.debug = { quickIcp: quickIcpDebug };
+  return result;
 }
 
 export async function generateNicheWizard(input: NicheFinderWizardInput): Promise<NicheResult> {
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const language = normalizeLanguage(input.language);
+  const languageInstruction = buildAiLanguageInstruction(language);
   const prompt = `Tu ești un expert în marketing fitness. Pe baza răspunsurilor antrenorului, creează:
 
 1. Nișa clară și specifică (1 propoziție precisă)
@@ -749,6 +1312,8 @@ Răspunsuri antrenor:
 3. Rezultate pe care le pot demonstra: "${input.q3}"
 4. Tip de client pe care vreau să-l evit: "${input.q4}"
 5. De ce m-ar alege pe mine: "${input.q5}"
+
+${languageInstruction}
 
 ${antiRepeatSection}
 
@@ -776,7 +1341,7 @@ FORMAT:
   ]
     .filter(Boolean)
     .join('; ');
-  return ensureCompleteNicheResult(parsed, contextHint);
+  return ensureCompleteNicheResult(parsed, contextHint, language);
 }
 
 // ==================== DAILY IDEA GENERATOR ====================
@@ -787,6 +1352,7 @@ export interface DailyIdeaInput {
   contentPreferences?: any;
   objective?: 'lead-gen' | 'engagement' | 'education';
   general?: boolean;
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
   recentIdeas?: {
     format: string;
@@ -839,6 +1405,7 @@ interface StructureUserIdeaInput {
   ideaText: string;
   niche: string;
   contentPreferences?: any;
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
@@ -848,6 +1415,12 @@ const STRUCTURED_IDEA_SECTION_TITLES = [
   'PARTEA 3 – Exemplu / aplicație',
   'PARTEA 4 – Principiu final',
 ] as const;
+const STRUCTURED_IDEA_SECTION_TITLES_EN = [
+  'PART 1 - Context',
+  'PART 2 - Clear explanation',
+  'PART 3 - Example / application',
+  'PART 4 - Final principle',
+] as const;
 
 const STRUCTURED_IDEA_DEFAULT_IMPROVEMENTS = [
   'Mesaj clarificat',
@@ -855,6 +1428,49 @@ const STRUCTURED_IDEA_DEFAULT_IMPROVEMENTS = [
   'Structură adăugată',
   'Ton adaptat la nișă',
 ] as const;
+
+function getStructuredIdeaSectionTitles(language: SupportedLanguage): readonly string[] {
+  return language === 'en' ? STRUCTURED_IDEA_SECTION_TITLES_EN : STRUCTURED_IDEA_SECTION_TITLES;
+}
+
+function localizeCtaStyleLabel(ctaStyle: string, language: SupportedLanguage): string {
+  const normalized = normalizeLooseComparisonText(ctaStyle);
+  const isSoft = normalized.includes('soft');
+  const isDirect = normalized.includes('direct');
+  const isEducational = normalized.includes('educational');
+  const isMix = normalized === 'mix' || normalized.includes('mix');
+
+  if (language === 'en') {
+    if (isSoft) return 'Soft (comment / question)';
+    if (isDirect) return 'Direct (write me X / send a message)';
+    if (isEducational) return 'Educational (save / share)';
+    if (isMix) return 'Mix';
+    return ctaStyle || 'Mix';
+  }
+
+  if (isSoft) return 'Soft (comentariu / întrebare)';
+  if (isDirect) return 'Direct (scrie-mi X / trimite mesaj)';
+  if (isEducational) return 'Educațional (salvează / share)';
+  if (isMix) return 'Mix';
+  return ctaStyle || 'Mix';
+}
+
+function localizeStructuredIdeaResult(result: StructuredIdeaResult, language: SupportedLanguage): StructuredIdeaResult {
+  const sectionTitles = getStructuredIdeaSectionTitles(language);
+  const improvements =
+    language === 'en'
+      ? ['Message clarified', 'Redundancy removed', 'Structure added', 'Tone adapted to the niche']
+      : ['Mesaj clarificat', 'Redundanță eliminată', 'Structură adăugată', 'Ton adaptat la nișă'];
+  return {
+    ...result,
+    script: result.script.map((section, index) => ({
+      ...section,
+      sectionTitle: sectionTitles[index] || section.sectionTitle,
+    })),
+    ctaStyleApplied: localizeCtaStyleLabel(result.ctaStyleApplied, language),
+    improvements,
+  };
+}
 
 function normalizeTextValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -1541,6 +2157,7 @@ function buildStructuredIdeaPrompt(input: StructureUserIdeaInput): { prompt: str
   const brandVoiceSection = buildBrandVoiceSection(input.contentPreferences);
   const ctaStyle = input.contentPreferences?.brandVoice?.ctaStyle || 'Mix';
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
 
   const prompt = `Tu ești un expert în content fitness și copywriting conversațional pentru Reels.
 
@@ -1560,6 +2177,8 @@ CONTEXT:
 🗣️ BRAND VOICE:
 ${brandVoiceSection}
 🎯 STIL CTA PREFERAT: ${ctaStyle}
+
+${languageInstruction}
 
 IDEEA BRUTĂ UTILIZATOR:
 """
@@ -1647,6 +2266,7 @@ async function generateStructuredIdeaFallback(
 ): Promise<StructuredIdeaResult> {
   const brandVoiceSection = buildBrandVoiceSection(input.contentPreferences);
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
   const sectionsSnapshot = partialResult.script
     .map((section, index) => `${index + 1}. ${section.sectionTitle}: ${section.text || '[LIPSĂ]'}`)
     .join('\n');
@@ -1657,6 +2277,8 @@ NIȘĂ: "${input.niche}"
 BRAND VOICE:
 ${brandVoiceSection}
 STIL CTA: ${fallbackCtaStyle}
+
+${languageInstruction}
 
 IDEA UTILIZATOR:
 """
@@ -2591,6 +3213,12 @@ async function generateStructuredIdeaTaggedFallback(
   input: StructureUserIdeaInput,
   fallbackCtaStyle: string
 ): Promise<StructuredIdeaResult> {
+  const language = normalizeLanguage(input.language);
+  const languageInstruction = buildAiLanguageInstruction(language);
+  const localizedImprovements =
+    language === 'en'
+      ? ['Message clarified', 'Redundancy removed', 'Structure added', 'Tone adapted to the niche']
+      : ['Mesaj clarificat', 'Redundanță eliminată', 'Structură adăugată', 'Ton adaptat la nișă'];
   const brandVoiceSection = buildBrandVoiceSection(input.contentPreferences);
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
   const prompt = `Rescrie ideea utilizatorului ca output structurat pentru un Reel.
@@ -2599,6 +3227,8 @@ NIȘĂ: "${input.niche}"
 BRAND VOICE:
 ${brandVoiceSection}
 STIL CTA: ${fallbackCtaStyle}
+
+${languageInstruction}
 
 ${antiRepeatSection}
 
@@ -2612,7 +3242,7 @@ Returnează DOAR text cu tag-urile de mai jos, fără markdown și fără explic
 - Fiecare secțiune trebuie să fie clară, completă și utilă.
 - Fiecare secțiune trebuie să aibă aproximativ 70-120 cuvinte.
 - CTA-ul trebuie să fie clar și acționabil.
-- improvements trebuie să fie exact cele 4 itemi din format.
+- improvements trebuie să fie exact cele 4 itemi din format (în limba cerută).
 - NU descrie cum ar trebui scris mesajul.
 - NU folosi formulări meta ca: "ideea trebuie", "mesajul trebuie", "în partea asta", "poți spune".
 - Scrie direct varianta finală, ca text vorbit, cu flow natural între secțiuni.
@@ -2630,10 +3260,7 @@ FORMAT EXACT:
 <cta>...</cta>
 <ctaStyle>${fallbackCtaStyle}</ctaStyle>
 <improvements>
-Mesaj clarificat
-Redundanță eliminată
-Structură adăugată
-Ton adaptat la nișă
+${localizedImprovements.join('\n')}
 </improvements>`;
 
   const generateTaggedContent = async () => generateGeminiText(prompt, 0.25, 2200);
@@ -3566,6 +4193,7 @@ Clar > impresionant
 
 export async function generateDailyIdea(input: DailyIdeaInput): Promise<DailyIdeaResult> {
   const objective = input.objective || 'lead-gen';
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
   const recentIdeasSection = buildRecentIdeasSection(input.recentIdeas);
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
   const brandVoiceSection = buildBrandVoiceSection(input.contentPreferences);
@@ -3579,8 +4207,7 @@ export async function generateDailyIdea(input: DailyIdeaInput): Promise<DailyIde
   
   const prompt = `Tu ești un expert în content marketing fitness cu focus pe conversii reale.
 
-TOT OUTPUT-UL TREBUIE SĂ FIE EXCLUSIV ÎN ROMÂNĂ NATURALĂ, CORECTĂ GRAMATICAL ȘI UȘOR DE ÎNȚELES PENTRU OAMENI DIN ROMÂNIA.
-NU traduce din engleză. NU folosi jargon englezesc dacă există variantă clară în română. Scrie ca un antrenor român real, pentru public român.
+${languageInstruction}
 
 CONTEXT CLIENT (CITEȘTE CU ATENȚIE - TOATE IDEILE TREBUIE SĂ FIE DESPRE ACEASTĂ NIȘĂ):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -3652,19 +4279,18 @@ REGULI STRICTE:
 Format: Alege între REEL (30-60 sec, 4-6 scene), CAROUSEL (6-9 slide-uri) sau STORY (15 sec, 3-4 scene).
 
 REGULĂ LINGVISTICĂ FINALĂ:
-- hook-ul, scriptul, CTA-ul, lead magnetul și reasoning-ul trebuie să fie în română nativă
-- fără romgleză inutilă
+- hook-ul, scriptul, CTA-ul, lead magnetul și reasoning-ul trebuie să respecte limba cerută mai sus
+- fără amestec inutil de română și engleză
 - fără traduceri literale
-- fără formulări care sună „americanizate”
-- fără expresii care ar confuza un public român
-- dacă o formulare nu ar fi spusă natural într-o conversație reală în România, rescrie-o
+- fără formulări care ar suna nenatural pentru publicul țintă
+- dacă o formulare nu ar fi spusă natural într-o conversație reală în limba cerută, rescrie-o
 - dacă un hook nu are sens complet de unul singur, rescrie-l
 - dacă o propoziție pare „puternică”, dar nu spune clar ceva concret, rescrie-o
 - claritatea și logica sunt obligatorii, nu opționale
 
 IMPORTANT PENTRU SCRIPT - CERINȚE DETALIATE:
 - Pentru fiecare scenă/slide, câmpul "text" trebuie să fie FOARTE DETALIAT și COMPLET
-- Minim 4-6 propoziții per scenă (≈ 80-150 de cuvinte), în română naturală și conversațională
+- Minim 4-6 propoziții per scenă (≈ 80-150 de cuvinte), în limba cerută, naturală și conversațională
 - Nicio scenă nu are voie să conțină formulări de tipul "scrie în DM", "comentează", "salvează", "swipe up", "trimite mesaj" sau alte CTA-uri mascate
 - Include:
   * Tranziții naturale ("Acum să-ți arăt...", "Uite ce se întâmplă...", "De ce funcționează?", "Hai să vorbim despre...")
@@ -3697,7 +4323,7 @@ FORMAT:
   "conversionRate": 45.5,
   "leadMagnet": "Lead magnet FOARTE specific și detaliat pentru nișă (descrie EXACT ce primește)",
   "dmKeyword": "Keyword-ul din DM",
-  "reasoning": "De ce funcționează această idee - 4-5 propoziții DETALIATE, scrise în română clară și naturală, care explică psihologia, pattern-urile de conversie, și de ce rezonează cu ICP-ul specific"
+  "reasoning": "De ce funcționează această idee - 4-5 propoziții DETALIATE, scrise clar și natural în limba cerută, care explică psihologia, pattern-urile de conversie, și de ce rezonează cu ICP-ul specific"
 }`;
 
   console.log(`🎯 Generating idea for niche: "${input.niche}"`);
@@ -3716,6 +4342,7 @@ FORMAT:
 export async function generateMultiFormatIdea(input: DailyIdeaInput): Promise<MultiFormatIdeaResult> {
   const objective = input.objective || 'lead-gen';
   const isGeneralIdea = input.general === true;
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
   const recentIdeasSection = buildRecentIdeasSection(input.recentIdeas);
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
   const brandVoiceSection = buildBrandVoiceSection(input.contentPreferences);
@@ -3731,7 +4358,9 @@ export async function generateMultiFormatIdea(input: DailyIdeaInput): Promise<Mu
     targets.length === 3 ? '3 idei de content' : `${targets.length} idei de content`
   } pentru un antrenor fitness din România.
 
-Scrie exclusiv în română naturală. Fără romgleză. Fără markdown. Fără JSON.
+${languageInstruction}
+
+Fără markdown. Fără JSON.
 Toate valorile trebuie să stea pe un singur rând. Nu folosi line breaks în interiorul câmpurilor.
 
 CONTEXT:
@@ -3845,6 +4474,8 @@ ${buildDelimitedFormatInstructions(targets)}`;
 
 export async function structureUserIdea(input: StructureUserIdeaInput): Promise<StructuredIdeaResult> {
   const { ctaStyle } = buildStructuredIdeaPrompt(input);
+  const language = normalizeLanguage(input.language);
+  const languageInstruction = buildAiLanguageInstruction(language);
   const brandVoiceSection = buildBrandVoiceSection(input.contentPreferences);
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
   const resolveGuaranteedStructuredIdea = async (): Promise<StructuredIdeaResult> => {
@@ -3852,14 +4483,14 @@ export async function structureUserIdea(input: StructureUserIdeaInput): Promise<
       const taggedFallback = await generateStructuredIdeaTaggedFallback(input, ctaStyle);
       console.log(`🧩 Structured idea tagged fallback returned hooks: "${taggedFallback.hooks[0]}" | "${taggedFallback.hooks[1]}"`);
       if (!isStructuredIdeaResultIncomplete(taggedFallback)) {
-        return taggedFallback;
+        return localizeStructuredIdeaResult(taggedFallback, language);
       }
 
       console.warn('Structured idea tagged fallback was incomplete, using emergency fallback.');
-      return buildStructuredIdeaEmergencyResult(input);
+      return localizeStructuredIdeaResult(buildStructuredIdeaEmergencyResult(input), language);
     } catch (error) {
       console.warn('Structured idea tagged fallback failed, using emergency fallback:', error);
-      return buildStructuredIdeaEmergencyResult(input);
+      return localizeStructuredIdeaResult(buildStructuredIdeaEmergencyResult(input), language);
     }
   };
 
@@ -3870,6 +4501,8 @@ BRAND VOICE:
 ${brandVoiceSection}
 STIL CTA: ${ctaStyle}
 
+${languageInstruction}
+
 ${antiRepeatSection}
 
 IDEA UTILIZATOR:
@@ -3878,7 +4511,7 @@ ${input.ideaText}
 """
 
 REGULI:
-- Scrie exclusiv în română naturală, ca text vorbit.
+- Scrie exclusiv în limba cerută mai sus, natural, ca text vorbit.
 - NU descrie cum ar trebui construit mesajul. Scrie direct varianta finală.
 - NU folosi formulări meta precum: "ideea trebuie", "mesajul trebuie", "în partea asta", "poți spune".
 - Dacă utilizatorul vorbește din experiență personală, păstrează acel unghi personal natural, dar curat.
@@ -3931,7 +4564,9 @@ ${buildStructuredIdeaDelimitedFormatInstructions(targets)}`;
             : (['mainIdea', 'hook1', 'hook2', 'section1', 'section2', 'section3', 'section4', 'cta'] as StructuredIdeaBlockKey[]);
       const retryContent = await generateDelimitedResponse(
         retryTargets,
-        `Lipseau sau erau slabe blocurile: ${retryTargets.join(', ')}. Refă doar aceste blocuri ca text final, natural și coerent.`
+        language === 'en'
+          ? `Missing or weak blocks: ${retryTargets.join(', ')}. Regenerate only these blocks as final, natural, coherent text in English.`
+          : `Lipseau sau erau slabe blocurile: ${retryTargets.join(', ')}. Refă doar aceste blocuri ca text final, natural și coerent.`
       );
       const retryParsed = parseStructuredIdeaDelimitedContent(retryContent, ctaStyle);
 
@@ -3960,30 +4595,30 @@ ${buildStructuredIdeaDelimitedFormatInstructions(targets)}`;
       result = mergedResult.result;
     }
 
-    if (!result) {
-      const acceptedFullAiResult = acceptStructuredIdeaResultFromFullAiBlocks(parsed, ctaStyle);
-      if (acceptedFullAiResult) {
-        console.warn('Structured idea AI result had all blocks but failed strict validation; keeping repaired AI result.');
-        console.log(
-          `🧩 Structured idea accepted from repaired AI path with hooks: "${acceptedFullAiResult.hooks[0]}" | "${acceptedFullAiResult.hooks[1]}"`
-        );
-        return acceptedFullAiResult;
-      }
+      if (!result) {
+        const acceptedFullAiResult = acceptStructuredIdeaResultFromFullAiBlocks(parsed, ctaStyle);
+        if (acceptedFullAiResult) {
+          console.warn('Structured idea AI result had all blocks but failed strict validation; keeping repaired AI result.');
+          console.log(
+            `🧩 Structured idea accepted from repaired AI path with hooks: "${acceptedFullAiResult.hooks[0]}" | "${acceptedFullAiResult.hooks[1]}"`
+          );
+          return localizeStructuredIdeaResult(acceptedFullAiResult, language);
+        }
 
-      if (missing.length > 0) {
-        const rescued = rescueStructuredIdeaResultFromPartial(parsed, ctaStyle);
-        if (rescued) {
-          console.warn('Structured idea AI result was missing only weak/non-critical blocks; rescued result without full fallback.');
-          console.log(`🧩 Structured idea rescued from AI path with hooks: "${rescued.hooks[0]}" | "${rescued.hooks[1]}"`);
-          return rescued;
+        if (missing.length > 0) {
+          const rescued = rescueStructuredIdeaResultFromPartial(parsed, ctaStyle);
+          if (rescued) {
+            console.warn('Structured idea AI result was missing only weak/non-critical blocks; rescued result without full fallback.');
+            console.log(`🧩 Structured idea rescued from AI path with hooks: "${rescued.hooks[0]}" | "${rescued.hooks[1]}"`);
+            return localizeStructuredIdeaResult(rescued, language);
+          }
         }
       }
-    }
 
-    if (result) {
-      console.log(`🧩 Structured idea generated from AI path with hooks: "${result.hooks[0]}" | "${result.hooks[1]}"`);
-      return result;
-    }
+      if (result) {
+        console.log(`🧩 Structured idea generated from AI path with hooks: "${result.hooks[0]}" | "${result.hooks[1]}"`);
+        return localizeStructuredIdeaResult(result, language);
+      }
 
     throw new Error(`Structured idea delimited response incomplete after retry: ${missing.join(', ')}`);
   } catch (error) {
@@ -4022,13 +4657,17 @@ function getAudioMimeType(audioFilePath: string): string {
   return 'application/octet-stream';
 }
 
-async function transcribeAudioWithGemini(audioFilePath: string): Promise<TranscriptionResult> {
+async function transcribeAudioWithGemini(
+  audioFilePath: string,
+  language: SupportedLanguage = 'ro'
+): Promise<TranscriptionResult> {
   const audioBase64 = readFileSync(audioFilePath).toString('base64');
+  const targetLanguage = language === 'en' ? 'English' : 'Romanian';
   const content = await createGeminiPartsText(
     [
       {
         text:
-          'Transcribe this audio in Romanian. Return only the spoken words, without commentary, labels, timestamps, or formatting cleanup beyond normal punctuation.',
+          `Transcribe this audio in ${targetLanguage}. Return only the spoken words, without commentary, labels, timestamps, or formatting cleanup beyond normal punctuation.`,
       },
       {
         inline_data: {
@@ -4045,11 +4684,15 @@ async function transcribeAudioWithGemini(audioFilePath: string): Promise<Transcr
 
   return {
     text: content.trim(),
-    language: 'ro',
+    language,
   };
 }
 
-export async function transcribeAudio(audioFilePath: string): Promise<TranscriptionResult> {
+export async function transcribeAudio(
+  audioFilePath: string,
+  language: SupportedLanguage = 'ro'
+): Promise<TranscriptionResult> {
+  const normalizedLanguage = normalizeLanguage(language);
   try {
     console.log(`🎙️ Transcribing audio from: ${audioFilePath}`);
 
@@ -4057,7 +4700,7 @@ export async function transcribeAudio(audioFilePath: string): Promise<Transcript
       const transcription = await getTranscriptionClient().audio.transcriptions.create({
         file: createReadStream(audioFilePath),
         model: 'whisper-1',
-        language: 'ro',
+        language: normalizedLanguage,
         response_format: 'verbose_json',
       });
 
@@ -4070,7 +4713,7 @@ export async function transcribeAudio(audioFilePath: string): Promise<Transcript
       };
     }
 
-    const transcription = await transcribeAudioWithGemini(audioFilePath);
+    const transcription = await transcribeAudioWithGemini(audioFilePath, normalizedLanguage);
     console.log(`✅ Gemini transcription complete: ${transcription.text.substring(0, 100)}...`);
     return transcription;
   } catch (error: any) {
@@ -4087,6 +4730,7 @@ export interface ContentFeedbackInput {
   duration?: number;
   niche?: string; // Optional context
   transcription?: string; // Whisper transcription for video
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
@@ -4132,6 +4776,17 @@ function normalizeSuggestion(entry: any): Suggestion | null {
 }
 
 function buildFeedbackFallbackSummary(input: ContentFeedbackInput, suggestions: Suggestion[]): string {
+  if (normalizeLanguage(input.language) === 'en') {
+    const context = input.transcription
+      ? 'The analysis was based on the audio transcript extracted from the video.'
+      : 'The analysis was based on general best practices for this content type.';
+    const topSuggestion = suggestions[0]?.text
+      ? `First priority: ${suggestions[0].text}`
+      : 'First priority: clarify the message, add trust proof, and close with a specific CTA.';
+
+    return `${context} The content needs improvements in clarity, trust, and conversion. ${topSuggestion}`;
+  }
+
   const context = input.transcription
     ? 'Analiza s-a bazat pe transcripția audio extrasă din video.'
     : 'Analiza s-a bazat pe best practices generale pentru acest tip de conținut.';
@@ -4146,27 +4801,47 @@ function normalizeContentFeedbackResult(
   parsed: Partial<ContentFeedbackResult> | null | undefined,
   input: ContentFeedbackInput
 ): ContentFeedbackResult {
+  const language = normalizeLanguage(input.language);
   const suggestions = Array.isArray(parsed?.suggestions)
     ? parsed.suggestions.map((entry) => normalizeSuggestion(entry)).filter((entry): entry is Suggestion => Boolean(entry))
     : [];
 
-  const fallbackSuggestions: Suggestion[] = [
-    {
-      type: 'warning',
-      category: 'clarity',
-      text: 'Mesajul principal nu este încă suficient de clar. Spune explicit din prima propoziție cui te adresezi și ce rezultat promiți.',
-    },
-    {
-      type: 'warning',
-      category: 'trust',
-      text: 'Adaugă un element de credibilitate: exemplu personal, rezultat concret sau dovadă socială.',
-    },
-    {
-      type: 'error',
-      category: 'cta',
-      text: 'Încheie cu un CTA specific și acționabil, nu cu o formulare vagă sau implicită.',
-    },
-  ];
+  const fallbackSuggestions: Suggestion[] =
+    language === 'en'
+      ? [
+          {
+            type: 'warning',
+            category: 'clarity',
+            text: 'The main message is not clear enough yet. State who the content is for and what result it promises in the first sentence.',
+          },
+          {
+            type: 'warning',
+            category: 'trust',
+            text: 'Add a credibility element: a personal example, a concrete client result, or a clear proof point.',
+          },
+          {
+            type: 'error',
+            category: 'cta',
+            text: 'Close with a specific, actionable CTA instead of a vague or implied next step.',
+          },
+        ]
+      : [
+          {
+            type: 'warning',
+            category: 'clarity',
+            text: 'Mesajul principal nu este încă suficient de clar. Spune explicit din prima propoziție cui te adresezi și ce rezultat promiți.',
+          },
+          {
+            type: 'warning',
+            category: 'trust',
+            text: 'Adaugă un element de credibilitate: exemplu personal, rezultat concret sau dovadă socială.',
+          },
+          {
+            type: 'error',
+            category: 'cta',
+            text: 'Încheie cu un CTA specific și acționabil, nu cu o formulare vagă sau implicită.',
+          },
+        ];
 
   const normalizedSuggestions: Suggestion[] =
     suggestions.length > 0
@@ -4192,6 +4867,7 @@ function normalizeContentFeedbackResult(
 
 export async function analyzeFeedback(input: ContentFeedbackInput): Promise<ContentFeedbackResult> {
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
   console.log(`🔍 analyzeFeedback called with:`, {
     fileType: input.fileType,
     hasNiche: !!input.niche,
@@ -4204,6 +4880,8 @@ export async function analyzeFeedback(input: ContentFeedbackInput): Promise<Cont
   const prompt = `Tu ești un expert în analiza content-ului fitness pe social media.
 
 Analizează acest ${input.fileType === 'video' ? 'VIDEO/REEL' : 'imagine/carousel'} pentru content fitness.
+
+${languageInstruction}
 
 ${input.niche ? `📍 NIȘA: "${input.niche}"` : ''}
 ${input.duration ? `⏱️ DURATĂ VIDEO: ${input.duration} secunde` : ''}
@@ -4325,6 +5003,7 @@ export interface NicheDiscoverPhaseAInput {
   commonProblems: string[];
   primaryOutcome: string;
   avoidContent: string[];
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
@@ -4338,64 +5017,183 @@ export interface PresetNicheOption {
   description: string;
 }
 
-function buildPresetNicheDescription(niche: string): string {
+export interface TranslateNicheProfileInput {
+  niche?: string;
+  idealClient?: string;
+  positioning?: string;
+  targetLanguage: SupportedLanguage;
+}
+
+export interface TranslateNicheProfileResult {
+  niche: string;
+  idealClient: string;
+  positioning: string;
+}
+
+function detectLikelyLanguage(text: string): SupportedLanguage | null {
+  const value = normalizeTextValue(text).toLowerCase();
+  if (!value) return null;
+
+  const hasRomanianDiacritics = /[ăâîșț]/.test(value);
+  if (hasRomanianDiacritics) return 'ro';
+
+  const roMarkers = [' pentru ', ' cu ', ' care ', ' și ', ' nișa ', ' antrenor ', ' rezultate '];
+  const enMarkers = [' for ', ' with ', ' who ', ' and ', ' niche ', ' coach ', ' results '];
+
+  const roScore = roMarkers.reduce((acc, marker) => acc + (value.includes(marker) ? 1 : 0), 0);
+  const enScore = enMarkers.reduce((acc, marker) => acc + (value.includes(marker) ? 1 : 0), 0);
+
+  if (roScore === enScore) return null;
+  return roScore > enScore ? 'ro' : 'en';
+}
+
+function isLikelyAlreadyInTargetLanguage(
+  input: { niche: string; idealClient: string; positioning: string },
+  targetLanguage: SupportedLanguage
+): boolean {
+  const values = [input.niche, input.idealClient, input.positioning]
+    .map((entry) => normalizeTextValue(entry))
+    .filter(Boolean);
+
+  if (!values.length) return true;
+
+  const detected = values
+    .map((entry) => detectLikelyLanguage(entry))
+    .filter((value): value is SupportedLanguage => Boolean(value));
+
+  if (!detected.length) return false;
+
+  return detected.every((value) => value === targetLanguage);
+}
+
+function shouldKeepOriginalTranslationValue(original: string, translated: string): boolean {
+  const originalText = normalizeTextValue(original);
+  const translatedText = normalizeTextValue(translated);
+
+  if (!translatedText) return true;
+  if (!originalText) return false;
+
+  if (originalText.length >= 40 && translatedText.length < Math.max(20, Math.floor(originalText.length * 0.35))) {
+    return true;
+  }
+
+  return false;
+}
+
+function getLocalizedNicheUi(language: SupportedLanguage) {
+  return language === 'en'
+    ? {
+        optionLabel: 'Option',
+        customFitnessNiche: 'Custom fitness niche',
+      }
+    : {
+        optionLabel: 'Varianta',
+        customFitnessNiche: 'Nișă fitness personalizată',
+      };
+}
+
+function buildPresetNicheDescription(niche: string, language: SupportedLanguage): string {
   const normalized = niche.toLowerCase();
 
   if (normalized.includes('post-partum') || normalized.includes('postpartum') || normalized.includes('post-natal')) {
-    return 'Pentru femei care vor să revină în formă după sarcină, cu un plan sigur, realist și adaptat perioadei post-partum.';
+    return language === 'en'
+      ? 'For women who want to get back in shape after pregnancy with a safe, realistic plan adapted to the postpartum period.'
+      : 'Pentru femei care vor să revină în formă după sarcină, cu un plan sigur, realist și adaptat perioadei post-partum.';
   }
 
   if (normalized.includes('femei')) {
-    return 'Pentru femei care vor rezultate vizibile printr-un proces clar, sustenabil și ușor de urmat.';
+    return language === 'en'
+      ? 'For women who want visible results through a clear, sustainable process that is easy to follow.'
+      : 'Pentru femei care vor rezultate vizibile printr-un proces clar, sustenabil și ușor de urmat.';
   }
 
   if (normalized.includes('bărbați') || normalized.includes('barbati')) {
-    return 'Pentru bărbați care vor să slăbească, să arate mai bine și să urmeze un plan simplu, fără complicații inutile.';
+    return language === 'en'
+      ? 'For men who want to lose fat, look better, and follow a simple plan without unnecessary complexity.'
+      : 'Pentru bărbați care vor să slăbească, să arate mai bine și să urmeze un plan simplu, fără complicații inutile.';
   }
 
   if (normalized.includes('35+') || normalized.includes('40+') || normalized.includes('persoane 35')) {
-    return 'Pentru adulți care vor mai multă energie, mai puțină grăsime și un program potrivit ritmului lor de viață.';
+    return language === 'en'
+      ? 'For adults who want more energy, less body fat, and a plan that fits their real lifestyle.'
+      : 'Pentru adulți care vor mai multă energie, mai puțină grăsime și un program potrivit ritmului lor de viață.';
   }
 
   if (normalized.includes('începători') || normalized.includes('incepatori') || normalized.includes('sedentari')) {
-    return 'Pentru persoane care pornesc de la zero și au nevoie de pași clari ca să capete consistență și rezultate reale.';
+    return language === 'en'
+      ? 'For people starting from zero who need clear steps to build consistency and achieve real results.'
+      : 'Pentru persoane care pornesc de la zero și au nevoie de pași clari ca să capete consistență și rezultate reale.';
   }
 
-  return `Pentru persoane interesate de ${niche.toLowerCase()}, cu focus pe rezultate clare și un proces ușor de urmat.`;
+  return language === 'en'
+    ? `For people interested in ${niche.toLowerCase()}, with a focus on clear results and an easy-to-follow process.`
+    : `Pentru persoane interesate de ${niche.toLowerCase()}, cu focus pe rezultate clare și un proces ușor de urmat.`;
 }
 
-const PRESET_NICHE_FALLBACKS: PresetNicheOption[] = [
-  {
-    niche: 'Slăbire pentru femei ocupate 30-45',
-    description:
-      'Pentru femei care vor să slăbească sustenabil, fără diete extreme, chiar dacă au un program aglomerat.',
-  },
-  {
-    niche: 'Tonifiere și revenire post-natală',
-    description:
-      'Pentru mame care vor să-și recapete energia, tonusul și încrederea după sarcină, cu pași siguri și realiști.',
-  },
-  {
-    niche: 'Transformare pentru bărbați ocupați',
-    description:
-      'Pentru bărbați care vor să dea jos grăsimea abdominală și să arate mai bine, fără să petreacă ore în sală.',
-  },
-  {
-    niche: 'Fitness pentru începători sedentari',
-    description:
-      'Pentru persoane care pornesc de la zero și au nevoie de un plan simplu ca să slăbească și să prindă consistență.',
-  },
-  {
-    niche: 'Recompunere corporală pentru persoane 35+',
-    description:
-      'Pentru adulți care vor să piardă grăsime, să-și păstreze masa musculară și să aibă mai multă energie după 35 de ani.',
-  },
-];
+function buildPresetNicheFallbacks(language: SupportedLanguage): PresetNicheOption[] {
+  if (language === 'en') {
+    return [
+      {
+        niche: 'Fat loss for busy women 30-45',
+        description:
+          'For women who want to lose fat sustainably without extreme diets, even with a busy schedule.',
+      },
+      {
+        niche: 'Postpartum toning and recovery',
+        description:
+          'For moms who want to regain energy, tone, and confidence after pregnancy with safe, realistic steps.',
+      },
+      {
+        niche: 'Transformation for busy men',
+        description:
+          'For men who want to lose belly fat and look better without spending hours in the gym.',
+      },
+      {
+        niche: 'Fitness for sedentary beginners',
+        description:
+          'For people starting from zero who need a simple plan to lose fat and build consistency.',
+      },
+      {
+        niche: 'Body recomposition for adults 35+',
+        description:
+          'For adults who want to lose fat, maintain muscle mass, and feel more energetic after 35.',
+      },
+    ];
+  }
 
-function normalizeNicheVariantEntry(value: unknown, index: number): NicheVariant | null {
+  return [
+    {
+      niche: 'Slăbire pentru femei ocupate 30-45',
+      description:
+        'Pentru femei care vor să slăbească sustenabil, fără diete extreme, chiar dacă au un program aglomerat.',
+    },
+    {
+      niche: 'Tonifiere și revenire post-natală',
+      description:
+        'Pentru mame care vor să-și recapete energia, tonusul și încrederea după sarcină, cu pași siguri și realiști.',
+    },
+    {
+      niche: 'Transformare pentru bărbați ocupați',
+      description:
+        'Pentru bărbați care vor să dea jos grăsimea abdominală și să arate mai bine, fără să petreacă ore în sală.',
+    },
+    {
+      niche: 'Fitness pentru începători sedentari',
+      description:
+        'Pentru persoane care pornesc de la zero și au nevoie de un plan simplu ca să slăbească și să prindă consistență.',
+    },
+    {
+      niche: 'Recompunere corporală pentru persoane 35+',
+      description:
+        'Pentru adulți care vor să piardă grăsime, să-și păstreze masa musculară și să aibă mai multă energie după 35 de ani.',
+    },
+  ];
+}
+
+function normalizeNicheVariantEntry(value: unknown, index: number, language: SupportedLanguage): NicheVariant | null {
   if (typeof value === 'string') {
     const variant = value.trim();
-    return variant ? sanitizeNicheVariant({ variant, description: '' }, index) : null;
+    return variant ? sanitizeNicheVariant({ variant, description: '' }, index, language) : null;
   }
 
   if (!value || typeof value !== 'object') {
@@ -4417,68 +5215,94 @@ function normalizeNicheVariantEntry(value: unknown, index: number): NicheVariant
   return sanitizeNicheVariant({
     variant,
     description: description || `Varianta ${index + 1}`,
-  }, index);
+  }, index, language);
 }
 
-function normalizeDiscoverAudience(input: NicheDiscoverPhaseAInput): string {
+function normalizeDiscoverAudience(input: NicheDiscoverPhaseAInput, language: SupportedLanguage = 'ro'): string {
   if (input.gender === 'femei') {
-    return 'femei';
+    return language === 'en' ? 'women' : 'femei';
   }
 
   if (input.gender === 'barbati') {
-    return 'bărbați';
+    return language === 'en' ? 'men' : 'bărbați';
   }
 
-  return 'persoane';
+  return language === 'en' ? 'people' : 'persoane';
 }
 
 function normalizeDiscoverAge(input: NicheDiscoverPhaseAInput): string {
   return input.ageRanges.length ? input.ageRanges.join(', ') : '25-45';
 }
 
-function normalizeOutcomeForTitle(value: string): string {
+function normalizeOutcomeForTitle(value: string, language: SupportedLanguage = 'ro'): string {
   const normalized = normalizeTextValue(value);
   if (!normalized) {
-    return 'Rezultate sustenabile';
+    return language === 'en' ? 'Sustainable results' : 'Rezultate sustenabile';
   }
 
   if (/^să\s+/i.test(normalized)) {
     const lower = normalized.toLowerCase();
-    if (lower.includes('slabeasca')) return 'Slăbire sustenabilă';
-    if (lower.includes('tonifieze')) return 'Tonifiere și formă fizică';
-    if (lower.includes('energie')) return 'Mai multă energie și echilibru';
-    return 'Progres clar și sustenabil';
+    if (lower.includes('slabeasca') || lower.includes('slăbească')) {
+      return language === 'en' ? 'Sustainable fat loss' : 'Slăbire sustenabilă';
+    }
+    if (lower.includes('tonifieze')) {
+      return language === 'en' ? 'Toning and body confidence' : 'Tonifiere și formă fizică';
+    }
+    if (lower.includes('energie')) {
+      return language === 'en' ? 'More energy and balance' : 'Mai multă energie și echilibru';
+    }
+    return language === 'en' ? 'Clear, sustainable progress' : 'Progres clar și sustenabil';
   }
 
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function normalizeOutcomeForSentence(value: string): string {
+function normalizeOutcomeForSentence(value: string, language: SupportedLanguage = 'ro'): string {
   const normalized = normalizeTextValue(value);
   if (!normalized) {
-    return 'rezultate sustenabile';
+    return language === 'en' ? 'get sustainable results' : 'rezultate sustenabile';
   }
 
   const lower = normalized.toLowerCase();
   if (lower.startsWith('să ')) {
+    if (language === 'en') {
+      if (lower.includes('slăb') || lower.includes('slab')) return 'lose fat sustainably';
+      if (lower.includes('tonifi')) return 'tone up without extremes';
+      if (lower.includes('energie')) return 'have more energy and control';
+      if (lower.includes('durer') || lower.includes('disconfort')) return 'reduce pain and discomfort';
+      return normalized.replace(/^să\s+/i, '').trim();
+    }
     return lower;
   }
-  if (lower.includes('slăb')) return 'să slăbească într-un mod sustenabil';
-  if (lower.includes('tonifi')) return 'să se tonifieze fără extreme';
-  if (lower.includes('energie')) return 'să aibă mai multă energie și control';
+  if (lower.includes('slăb')) return language === 'en' ? 'lose fat sustainably' : 'să slăbească într-un mod sustenabil';
+  if (lower.includes('tonifi')) return language === 'en' ? 'tone up without extremes' : 'să se tonifieze fără extreme';
+  if (lower.includes('energie')) return language === 'en' ? 'have more energy and control' : 'să aibă mai multă energie și control';
   if (lower.includes('durer') || lower.includes('disconfort')) {
-    return 'să scape de durere și disconfort';
+    return language === 'en' ? 'reduce pain and discomfort' : 'să scape de durere și disconfort';
   }
-  return `să obțină ${normalized.toLowerCase()}`;
+  return language === 'en'
+    ? normalized.charAt(0).toLowerCase() + normalized.slice(1)
+    : `să obțină ${normalized.toLowerCase()}`;
 }
 
-function normalizeProblemForSentence(value: string): string {
+function normalizeProblemForSentence(value: string, language: SupportedLanguage = 'ro'): string {
   const normalized = normalizeTextValue(value);
   if (!normalized) {
-    return 'lipsa de claritate și consecvență';
+    return language === 'en' ? 'lack of clarity and consistency' : 'lipsa de claritate și consecvență';
   }
 
   const lower = normalized.toLowerCase();
+  if (language === 'en') {
+    if (lower.includes('consecven')) return 'lack of consistency';
+    if (lower.includes('energie')) return 'low energy';
+    if (lower.includes('confuz')) return 'confusion about what to do';
+    if (lower.includes('aliment')) return 'chaotic eating';
+    if (lower.includes('frica') || lower.includes('rusinea') || lower.includes('rușinea')) {
+      return 'fear or embarrassment about the gym';
+    }
+    return normalized.charAt(0).toLowerCase() + normalized.slice(1);
+  }
+
   if (lower.startsWith('lipsa de ')) {
     return normalized.toLowerCase();
   }
@@ -4486,31 +5310,46 @@ function normalizeProblemForSentence(value: string): string {
   return normalized.charAt(0).toLowerCase() + normalized.slice(1);
 }
 
-function normalizeSituationForSentence(value: string): string {
+function normalizeSituationForSentence(value: string, language: SupportedLanguage = 'ro'): string {
   const normalized = normalizeTextValue(value);
   if (!normalized) {
-    return 'au nevoie de o abordare realistă';
+    return language === 'en' ? 'need a realistic approach' : 'au nevoie de o abordare realistă';
   }
 
-  return normalized
+  const cleaned = normalized
     .replace(/^c[âa]nd\s+/i, '')
     .replace(/^că\s+/i, '')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^[A-ZĂÂÎȘȚ]/, (char) => char.toLowerCase());
-}
 
-function buildVariantDescriptionFromTitle(title: string): string {
-  const normalized = normalizeTextValue(title);
-  if (!normalized) {
-    return 'O direcție clară, cu un public bine definit, o problemă centrală recognoscibilă și o promisiune care poate fi rafinată mai departe în pasul următor.';
+  if (language === 'en') {
+    const lower = cleaned.toLowerCase();
+    if (lower.includes('ocup') || lower.includes('dezorganiz')) return 'are busy and disorganized';
+    if (lower.includes('estetic')) return 'want better aesthetics but struggle to stay consistent';
+    if (lower.includes('la inceput') || lower.includes('la început')) return 'are just starting and need guidance';
+    if (lower.includes('nu au structura') || lower.includes('nu au structură')) return 'know what to do but have no structure';
+    if (lower.includes('durer') || lower.includes('limit')) return 'have pain or limitations and are afraid to start';
   }
 
-  return `O direcție clară pentru ${normalized.toLowerCase()}, cu un public bine conturat și un mesaj ușor de rafinat mai departe. Varianta scoate în evidență problema principală a clientului și tipul de rezultat pe care îl urmărește, fără să alunece în promisiuni exagerate.`;
+  return cleaned;
 }
 
-function sanitizeNicheVariant(variant: NicheVariant, index: number): NicheVariant {
-  const fallbackTitle = `Varianta ${index + 1}`;
+function buildVariantDescriptionFromTitle(title: string, language: SupportedLanguage = 'ro'): string {
+  const normalized = normalizeTextValue(title);
+  if (!normalized) {
+    return language === 'en'
+      ? 'A clear direction with a defined audience, a recognizable core problem, and a promise that can be refined further in the next step.'
+      : 'O direcție clară, cu un public bine definit, o problemă centrală recognoscibilă și o promisiune care poate fi rafinată mai departe în pasul următor.';
+  }
+
+  return language === 'en'
+    ? `A clear direction for ${normalized.toLowerCase()}, with a well-defined audience and a message that can be refined further. This option highlights the client's main problem and the kind of result they want, without slipping into exaggerated promises.`
+    : `O direcție clară pentru ${normalized.toLowerCase()}, cu un public bine conturat și un mesaj ușor de rafinat mai departe. Varianta scoate în evidență problema principală a clientului și tipul de rezultat pe care îl urmărește, fără să alunece în promisiuni exagerate.`;
+}
+
+function sanitizeNicheVariant(variant: NicheVariant, index: number, language: SupportedLanguage = 'ro'): NicheVariant {
+  const fallbackTitle = language === 'en' ? `Option ${index + 1}` : `Varianta ${index + 1}`;
   const cleanedTitle = normalizeTextValue(variant.variant)
     .replace(/^să\s+/i, '')
     .replace(/\s+/g, ' ')
@@ -4528,36 +5367,63 @@ function sanitizeNicheVariant(variant: NicheVariant, index: number): NicheVarian
 
   return {
     variant: cleanedTitle || fallbackTitle,
-    description: cleanedDescription || buildVariantDescriptionFromTitle(cleanedTitle || fallbackTitle),
+    description: cleanedDescription || buildVariantDescriptionFromTitle(cleanedTitle || fallbackTitle, language),
   };
 }
 
-function buildFallbackNicheVariants(input: NicheDiscoverPhaseAInput): NicheVariant[] {
-  const audience = normalizeDiscoverAudience(input);
+function buildFallbackNicheVariants(input: NicheDiscoverPhaseAInput, language: SupportedLanguage): NicheVariant[] {
+  const audience = normalizeDiscoverAudience(input, language);
   const ages = normalizeDiscoverAge(input);
-  const topSituation = normalizeSituationForSentence(input.valueSituations[0] || '');
-  const topProblem = normalizeProblemForSentence(input.commonProblems[0] || '');
-  const topOutcomeTitle = normalizeOutcomeForTitle(input.primaryOutcome || '');
-  const topOutcomeSentence = normalizeOutcomeForSentence(input.primaryOutcome || '');
+  const topSituation = normalizeSituationForSentence(input.valueSituations[0] || '', language);
+  const topProblem = normalizeProblemForSentence(input.commonProblems[0] || '', language);
+  const topOutcomeTitle = normalizeOutcomeForTitle(input.primaryOutcome || '', language);
+  const topOutcomeSentence = normalizeOutcomeForSentence(input.primaryOutcome || '', language);
+
+  if (language === 'en') {
+    return [
+      sanitizeNicheVariant({
+        variant: `${topOutcomeTitle} for ${audience} ${ages}`,
+        description: `For ${audience} aged ${ages} who need a realistic path forward. This direction focuses on a clear, practical process for people who want ${topOutcomeSentence}. It works well if you want your message to feel grounded, useful, and easy to trust.`,
+      }, 0, language),
+      sanitizeNicheVariant({
+        variant: `Sustainable fitness for ${audience} with a busy schedule`,
+        description: `For ${audience} who want visible results but keep running into ${topProblem}. The focus here is on solutions that fit a full schedule, not on perfection. It is a strong option if you want to position training as realistic, sustainable, and easier to maintain long term.`,
+      }, 1, language),
+      sanitizeNicheVariant({
+        variant: `Realistic transformation for ${audience} who need consistency`,
+        description: `For ${audience} who need structure, clarity, and practical steps they can follow in everyday life. This direction highlights consistency, confidence, and sustainable progress instead of quick fixes. It fits well if you want a more mature, stable positioning angle built around long-term progress.`,
+      }, 2, language),
+    ];
+  }
 
   return [
     sanitizeNicheVariant({
       variant: `${topOutcomeTitle} pentru ${audience} ${ages}`,
       description: `Pentru ${audience} de ${ages} care ${topSituation}. Varianta vorbește despre un proces clar, realist și ușor de urmat pentru cei care vor ${topOutcomeSentence}. Se potrivește bine dacă vrei să comunici ghidaj, claritate și progres vizibil, fără presiune inutilă sau soluții extreme.`,
-    }, 0),
+    }, 0, language),
     sanitizeNicheVariant({
       variant: `Fitness sustenabil pentru ${audience} cu program aglomerat`,
       description: `Pentru ${audience} care vor rezultate vizibile, dar se lovesc constant de ${topProblem}. Aici accentul cade pe soluții aplicabile într-un program plin, nu pe perfecțiune. Este o variantă bună dacă vrei să poziționezi antrenamentul ca ceva sustenabil, adaptat vieții reale și ușor de păstrat pe termen lung.`,
-    }, 1),
+    }, 1, language),
     sanitizeNicheVariant({
       variant: `Transformare realistă pentru ${audience} care vor consecvență`,
       description: `Pentru ${audience} care au nevoie de structură, claritate și pași aplicabili în viața de zi cu zi. Direcția pune accent pe consecvență, încredere și rezultate sustenabile, nu pe schimbări rapide. Funcționează bine dacă vrei un mesaj mai matur, mai stabil și mai orientat spre progres pe termen lung.`,
-    }, 2),
+    }, 2, language),
   ];
 }
 
 export async function generateNicheVariants(input: NicheDiscoverPhaseAInput): Promise<{ variants: NicheVariant[] }> {
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const language = normalizeLanguage(input.language);
+  const languageInstruction = buildAiLanguageInstruction(language);
+  const strictLanguageReminder =
+    language === 'en'
+      ? [
+          'CRITICAL LANGUAGE RULE:',
+          '- All "variant" and "description" values must be written in English only.',
+          '- Do not answer in Romanian.',
+        ].join('\n')
+      : '';
   const prompt = `Tu ești un expert în marketing fitness. Pe baza răspunsurilor antrenorului, propune EXACT 3 variante de nișă.
 
 RĂSPUNSURI ANTRENOR:
@@ -4568,6 +5434,9 @@ RĂSPUNSURI ANTRENOR:
 🚨 Problemă explicată cel mai des: ${input.commonProblems.join(', ')}
 ✅ Ce vrea să rezolve în 2-3 luni: ${input.primaryOutcome}
 ❌ Content de evitat: ${input.avoidContent.join(', ') || 'N/A'}
+
+${languageInstruction}
+${strictLanguageReminder ? `\n\n${strictLanguageReminder}` : ''}
 
 ${antiRepeatSection}
 
@@ -4580,7 +5449,7 @@ Pentru fiecare "description":
 - arată ce problemă principală rezolvă
 - explică ce tip de rezultat promite
 - spune ce unghi de mesaj sau poziționare transmite
-- scrie în română naturală, clară, fără formulări corporatiste sau propoziții incomplete
+- scrie în limba cerută mai sus, natural, clar, fără formulări corporatiste sau propoziții incomplete
 
 Răspunde DOAR în format JSON strict, fără markdown.
 IMPORTANT:
@@ -4608,12 +5477,12 @@ FORMAT:
         : [];
 
   const variants = rawVariants
-    .map((variant: unknown, index: number) => normalizeNicheVariantEntry(variant, index))
+    .map((variant: unknown, index: number) => normalizeNicheVariantEntry(variant, index, language))
     .filter((variant: NicheVariant | null): variant is NicheVariant => Boolean(variant))
     .slice(0, 3);
 
   const usedTitles = new Set(variants.map((variant: NicheVariant) => variant.variant.toLowerCase()));
-  for (const fallback of buildFallbackNicheVariants(input)) {
+  for (const fallback of buildFallbackNicheVariants(input, language)) {
     if (variants.length >= 3) {
       break;
     }
@@ -4634,12 +5503,25 @@ FORMAT:
 }
 
 export async function generatePresetNicheOptions(
-  generationContext?: GenerationPromptContext
+  generationContext?: GenerationPromptContext & { language?: SupportedLanguage }
 ): Promise<{ niches: PresetNicheOption[] }> {
   const antiRepeatSection = buildAntiRepeatPromptSection(generationContext);
+  const language = normalizeLanguage(generationContext?.language);
+  const languageInstruction = buildAiLanguageInstruction(language);
+  const strictLanguageReminder =
+    language === 'en'
+      ? [
+          'CRITICAL LANGUAGE RULE:',
+          '- All "niche" and "description" values must be written in English only.',
+          '- Do not answer in Romanian.',
+        ].join('\n')
+      : '';
   const prompt = `Tu ești un expert în marketing fitness pentru antrenori din România.
 
-Generează EXACT 5 nișe prestabilite în limba română pe care un fitness coach din România le-ar putea alege rapid.
+Generează EXACT 5 nișe prestabilite pe care un fitness coach le-ar putea alege rapid.
+
+${languageInstruction}
+${strictLanguageReminder ? `\n\n${strictLanguageReminder}` : ''}
 
 CERINȚE:
 - Fiecare nișă trebuie să fie clară, specifică și realistă pentru un antrenor de fitness.
@@ -4647,7 +5529,7 @@ CERINȚE:
 - Variază publicul și rezultatul promis.
 - "niche" = titlu scurt, clar, ușor de ales dintr-un click.
 - "description" = 1-2 propoziții despre cui se adresează și ce rezultat urmărește.
-- Tot output-ul trebuie să fie exclusiv în română naturală.
+- Tot output-ul trebuie să respecte limba cerută mai sus.
 
 ${antiRepeatSection}
 
@@ -4689,7 +5571,7 @@ FORMAT:
 
       return {
         niche,
-        description: description || buildPresetNicheDescription(niche),
+        description: description || buildPresetNicheDescription(niche, language),
       };
     })
     .filter((entry: PresetNicheOption | null): entry is PresetNicheOption => Boolean(entry))
@@ -4697,7 +5579,7 @@ FORMAT:
 
   const usedTitles = new Set(niches.map((entry: PresetNicheOption) => entry.niche.toLowerCase()));
 
-  for (const fallback of PRESET_NICHE_FALLBACKS) {
+  for (const fallback of buildPresetNicheFallbacks(language)) {
     if (niches.length >= 5) {
       break;
     }
@@ -4711,6 +5593,63 @@ FORMAT:
   }
 
   return { niches };
+}
+
+export async function translateNicheProfile(
+  input: TranslateNicheProfileInput
+): Promise<TranslateNicheProfileResult> {
+  const niche = normalizeTextValue(input.niche) || '';
+  const idealClient = normalizeTextValue(input.idealClient) || '';
+  const positioning = normalizeTextValue(input.positioning) || '';
+  const normalizedTargetLanguage = normalizeLanguage(input.targetLanguage);
+
+  if (!niche && !idealClient && !positioning) {
+    return { niche: '', idealClient: '', positioning: '' };
+  }
+
+  if (isLikelyAlreadyInTargetLanguage({ niche, idealClient, positioning }, normalizedTargetLanguage)) {
+    return { niche, idealClient, positioning };
+  }
+
+  const targetLanguageLabel = normalizedTargetLanguage === 'en' ? 'English' : 'Romanian';
+  const prompt = `You are translating a fitness coach niche profile for display inside the app.
+
+Translate the content into ${targetLanguageLabel}.
+Rules:
+- Preserve the exact meaning, specificity, and marketing intent.
+- Keep the niche concise and specific.
+- Keep the positioning persuasive and natural in the target language.
+- If a field is already in the target language, keep it natural and only lightly polish it if needed.
+- Return strict JSON only, without markdown.
+
+FORMAT:
+{
+  "niche": "translated niche",
+  "idealClient": "translated ideal client profile",
+  "positioning": "translated positioning message"
+}
+
+INPUT:
+- niche: ${JSON.stringify(niche)}
+- idealClient: ${JSON.stringify(idealClient)}
+- positioning: ${JSON.stringify(positioning)}`;
+
+  const content = await generateGeminiJson(prompt, 0.2, 900);
+  const parsed = await parseModelJson<Partial<TranslateNicheProfileResult>>(content);
+
+  const translatedNiche = normalizeTextValue(parsed?.niche);
+  const translatedIdealClient = normalizeTextValue(parsed?.idealClient);
+  const translatedPositioning = normalizeTextValue(parsed?.positioning);
+
+  return {
+    niche: shouldKeepOriginalTranslationValue(niche, translatedNiche) ? niche : translatedNiche,
+    idealClient: shouldKeepOriginalTranslationValue(idealClient, translatedIdealClient)
+      ? idealClient
+      : translatedIdealClient,
+    positioning: shouldKeepOriginalTranslationValue(positioning, translatedPositioning)
+      ? positioning
+      : translatedPositioning,
+  };
 }
 
 // ==================== QUESTIONNAIRE: DISCOVER NICHE (PHASE C - REFINEMENT) ====================
@@ -4739,16 +5678,28 @@ export interface NicheDiscoverInput {
   evening?: string[];
   definingSituations?: string[];
   notes?: string;
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
 export async function generateNicheDiscover(input: NicheDiscoverInput): Promise<NicheResult> {
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const language = normalizeLanguage(input.language);
+  const languageInstruction = buildAiLanguageInstruction(language);
+  const strictLanguageReminder =
+    language === 'en'
+      ? [
+          'CRITICAL LANGUAGE RULE:',
+          '- The final values for "niche", "idealClient", and "positioning" must be in English only.',
+          '- The questionnaire answers may be written in Romanian, but that does not change the output language.',
+          '- Do not answer in Romanian.',
+        ].join('\n')
+      : '';
   const prompt = `Tu ești un expert în marketing fitness. Antrenorul a ales nișa "${input.selectedNiche}" și acum vrei să o rafinezi pe baza răspunsurilor detaliate.
 
 Creează:
 1. Nișa RAFINATĂ și specifică (1 propoziție precisă, bazată pe "${input.selectedNiche}" dar mai precizată)
-2. Profilul clientului ideal ULTRA-DETALIAT (5-6 paragrafe care combină tot ce știi)
+2. Profilul clientului ideal ULTRA-DETALIAT (2-3 paragrafe consistente care combină tot ce știi)
 3. Mesaj de poziționare puternic (2-3 propoziții, unique value proposition)
 
 CONTEXTUL INIȚIAL (Faza A):
@@ -4782,17 +5733,20 @@ ZIUA TIPICĂ A CLIENTULUI:
 ⭐ Situații: ${input.definingSituations?.join(', ') || 'N/A'}
 ${input.notes ? `📝 Note: ${input.notes}` : ''}
 
+${languageInstruction}
+${strictLanguageReminder ? `\n\n${strictLanguageReminder}` : ''}
+
 ${antiRepeatSection}
 
 INSTRUCȚIUNI:
 - "niche": Rafinează nișa aleasă să fie SUPER precisă (include vârsta, situația, obiectivul principal)
-- "idealClient": Scrie 5-6 paragrafe DETALIATE în proză (nu bullet points):
+- "idealClient": Scrie 2-3 paragrafe DETALIATE în proză (nu bullet points):
   * Paragraf 1: Cine sunt (demografic + situație de viață)
   * Paragraf 2: Rutina zilnică (de la trezire la culcare)
   * Paragraf 3: Pain points și frustrări (awareness + identitate + blocaje)
-  * Paragraf 4: Obiective și motivații (ce vor cu adevărat)
-  * Paragraf 5-6: De ce alte soluții nu au funcționat + ce îi face unici
+- "idealClient" trebuie să aibă 140-240 cuvinte și să fie complet, nu tăiat
 - "positioning": Mesaj puternic care vorbește direct despre problema lor principală
+- "positioning" trebuie să aibă 45-90 cuvinte și să fie complet, nu tăiat
 
 Răspunde DOAR în format JSON strict, fără markdown.
 IMPORTANT:
@@ -4803,12 +5757,12 @@ IMPORTANT:
 FORMAT:
 {
   "niche": "Nișa ta RAFINATĂ aici",
-  "idealClient": "Profilul ULTRA-DETALIAT (5-6 paragrafe în proză)",
+  "idealClient": "Profilul ULTRA-DETALIAT (2-3 paragrafe în proză)",
   "positioning": "Mesajul tău de poziționare puternic"
 }`;
 
-  const content = await generateGeminiJson(prompt, 0.7, 1200);
-  const parsed = await parseModelJson<Partial<NicheResult>>(content);
+  const content = await generateGeminiJson(prompt, 0.7, 1800);
+  const parsed = normalizeNicheResultAliases(await parseModelJson<Partial<NicheResult>>(content));
   const contextHint = [
     `nișa selectată ${input.selectedNiche}`,
     `gen ${input.gender}`,
@@ -4820,13 +5774,59 @@ FORMAT:
   ]
     .filter(Boolean)
     .join('; ');
-  const fallbackNiche = buildDiscoverFallbackNiche(input);
+  const fallbackNiche = buildDiscoverFallbackNiche(input, language);
+  const enrichedParsed: Partial<NicheResult> = { ...parsed };
+  if (isLikelyIncompleteGeneratedText(normalizeTextField(enrichedParsed.idealClient), language) || !hasMinimumUsefulLength(normalizeTextField(enrichedParsed.idealClient), 'idealClient')) {
+    enrichedParsed.idealClient = await generateQuickIcpFieldText({
+      field: 'idealClient',
+      niche: normalizeTextField(enrichedParsed.niche) || fallbackNiche,
+      input: {
+        gender: input.gender,
+        ageRanges: input.ageRanges,
+        wakeUpTime: input.wakeUpTime,
+        jobType: input.jobType,
+        sittingTime: input.sittingTime,
+        morning: input.morning,
+        lunch: input.lunch,
+        evening: input.evening,
+        definingSituations: input.definingSituations,
+        differentiation: input.selectedNiche,
+        internalObjections: [input.clientStatement],
+      },
+      language,
+      languageInstruction,
+      strictLanguageReminder,
+    });
+  }
+  if (isLikelyIncompleteGeneratedText(normalizeTextField(enrichedParsed.positioning), language) || !hasMinimumUsefulLength(normalizeTextField(enrichedParsed.positioning), 'positioning')) {
+    enrichedParsed.positioning = await generateQuickIcpFieldText({
+      field: 'positioning',
+      niche: normalizeTextField(enrichedParsed.niche) || fallbackNiche,
+      input: {
+        gender: input.gender,
+        ageRanges: input.ageRanges,
+        wakeUpTime: input.wakeUpTime,
+        jobType: input.jobType,
+        sittingTime: input.sittingTime,
+        morning: input.morning,
+        lunch: input.lunch,
+        evening: input.evening,
+        definingSituations: input.definingSituations,
+        differentiation: input.selectedNiche,
+        internalObjections: [input.clientStatement],
+      },
+      language,
+      languageInstruction,
+      strictLanguageReminder,
+    });
+  }
   return ensureCompleteNicheResult(
-    parsed,
+    enrichedParsed,
     contextHint,
+    language,
     fallbackNiche,
-    buildDiscoverFallbackIdealClient(input, fallbackNiche),
-    buildDiscoverFallbackPositioning(input, fallbackNiche)
+    buildDiscoverFallbackIdealClient(input, fallbackNiche, language),
+    buildDiscoverFallbackPositioning(input, fallbackNiche, language)
   );
 }
 
@@ -4843,11 +5843,13 @@ export interface ICPDayInput {
   evening?: string[];
   definingSituations?: string[];
   notes?: string;
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
 export async function generateICPDay(input: ICPDayInput): Promise<{ icpProfile: string }> {
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
   const prompt = `Tu ești un expert în marketing fitness. Pe baza informațiilor despre ziua tipică a clientului ideal, creează un profil ICP detaliat (3-4 paragrafe) care descrie:
 
 1. Demografic (gen, vârstă)
@@ -4868,9 +5870,11 @@ INFORMAȚII CLIENT IDEAL:
 ⭐ Situații definitorii: ${input.definingSituations?.join(', ') || 'N/A'}
 ${input.notes ? `📝 Note: ${input.notes}` : ''}
 
+${languageInstruction}
+
 ${antiRepeatSection}
 
-Scrie un profil de client ideal natural, în română, 3-4 paragrafe. NU folosi bullet points, doar proză.
+Scrie un profil de client ideal natural, în limba cerută mai sus, 3-4 paragrafe. NU folosi bullet points, doar proză.
 
 Răspunde DOAR cu textul profilului (fără JSON, fără markdown).`;
 
@@ -4887,11 +5891,13 @@ export interface TextContentFeedbackInput {
   icpProfile?: any;
   positioningMessage?: string;
   toneOfVoice?: string;
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
 export async function analyzeTextContent(input: TextContentFeedbackInput): Promise<ContentFeedbackResult> {
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
   const formatInstructions = {
     reel: 'REEL (30-60 secunde, 4-6 scene): Hook dinamic, script energic, vizual puternic',
     carousel: 'CAROUSEL (6-9 slide-uri): Hook intrigant, fiecare slide = un pas/idee, perfect pentru liste',
@@ -4920,6 +5926,8 @@ export async function analyzeTextContent(input: TextContentFeedbackInput): Promi
   const prompt = `Tu ești un expert în analiza content-ului fitness pe social media specializat în conversii.
 
 ${contextSection ? `CONTEXTUL TĂU PERSONAL:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${contextSection}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` : ''}FORMAT POSTARE: ${formatGuide}
+
+${languageInstruction}
 
 TEXTUL POSTAT:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -5053,6 +6061,7 @@ export async function generateMarketingEmail(
   input: GenerateMarketingEmailInput
 ): Promise<MarketingEmailResult> {
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
   const icp =
     typeof input.userContext.icpProfile === 'string'
       ? input.userContext.icpProfile
@@ -5080,6 +6089,8 @@ BRIEF EMAIL:
 - CTA goal: ${input.ctaGoal || 'N/A'}
 - Language: ${input.language}
 
+${languageInstruction}
+
 CERINȚE:
 1) Emailul trebuie să fie specific nișei și ICP-ului, NU generic.
 2) Include mecanisme de conversie: hook, relevanță, proof, CTA clar.
@@ -5101,17 +6112,65 @@ Răspunde DOAR JSON strict:
 }`;
 
   const content = (await generateGeminiText(prompt, 0.65, 1800)) || '{}';
-  const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-  const parsed = JSON.parse(cleaned);
+  const parsed = await parseModelJson<Partial<MarketingEmailResult>>(content);
+  const language = normalizeLanguage(input.language);
+  const fallbackSubjectOptions =
+    language === 'en'
+      ? [
+          `A simple plan for ${input.topic}`,
+          'Stay consistent when life gets busy',
+          'Make training easier to follow',
+        ]
+      : [
+          `Un plan simplu pentru ${input.topic}`,
+          'Cum rămâi consecvent când ai program aglomerat',
+          'Fă antrenamentul mai ușor de ținut',
+        ];
+  const fallbackPreview =
+    language === 'en'
+      ? 'A practical way to stay consistent without adding pressure to your schedule.'
+      : 'O metodă practică să rămâi consecvent fără să adaugi presiune în program.';
+  const fallbackCta =
+    language === 'en'
+      ? input.ctaGoal || 'Reply to this email and I will send you the next practical step.'
+      : input.ctaGoal || 'Răspunde la acest email și îți trimit următorul pas practic.';
+  const fallbackBody =
+    language === 'en'
+      ? [
+          `Hi,`,
+          ``,
+          `If your schedule gets busy, consistency does not have to disappear. The goal is not to force a perfect routine, but to keep a simple minimum that still moves you forward.`,
+          ``,
+          `Start with the smallest version of the habit: one short workout, one planned meal, or one clear decision before the day takes over. That keeps momentum alive even when work is demanding.`,
+          ``,
+          `For ${input.userContext.niche || 'your fitness goal'}, this matters because the result comes from repeated execution, not from a few perfect weeks.`,
+          ``,
+          fallbackCta,
+        ].join('\n')
+      : [
+          `Salut,`,
+          ``,
+          `Când programul se aglomerează, consecvența nu trebuie să dispară. Scopul nu este să forțezi o rutină perfectă, ci să păstrezi un minim simplu care te duce înainte.`,
+          ``,
+          `Începe cu cea mai mică versiune a obiceiului: un antrenament scurt, o masă planificată sau o decizie clară înainte să te prindă ziua din urmă. Așa păstrezi ritmul chiar și când munca devine solicitantă.`,
+          ``,
+          `Pentru ${input.userContext.niche || 'obiectivul tău fitness'}, rezultatul vine din execuție repetată, nu din câteva săptămâni perfecte.`,
+          ``,
+          fallbackCta,
+        ].join('\n');
 
   return {
     subjectOptions: Array.isArray(parsed.subjectOptions)
       ? parsed.subjectOptions.slice(0, 3)
-      : [],
-    previewText: parsed.previewText || '',
-    body: parsed.body || '',
-    cta: parsed.cta || '',
-    angles: Array.isArray(parsed.angles) ? parsed.angles.slice(0, 5) : [],
+      : fallbackSubjectOptions,
+    previewText: parsed.previewText || fallbackPreview,
+    body: parsed.body || fallbackBody,
+    cta: parsed.cta || fallbackCta,
+    angles: Array.isArray(parsed.angles) && parsed.angles.length
+      ? parsed.angles.slice(0, 5)
+      : language === 'en'
+        ? ['consistency', 'busy schedule', 'simple execution']
+        : ['consecvență', 'program aglomerat', 'execuție simplă'],
   };
 }
 
@@ -5161,6 +6220,7 @@ export interface GenerateClientNutritionPlanInput {
     | 'macros-plus-examples'
     | 'flexible-template'
     | 'full-day-with-alternatives';
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
@@ -5221,8 +6281,11 @@ export async function generateClientNutritionPlan(
 ): Promise<NutritionPlanResult> {
   const mealsPerDay = getMealsPerDay(input);
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
 
   const prompt = `Tu ești un nutriționist sportiv senior pentru clienți fitness.
+
+${languageInstruction}
 
 Generează un plan alimentar zilnic care respectă STRICT valorile totale introduse.
 
@@ -5275,7 +6338,7 @@ REGULĂ OBLIGATORIE:
 
 Răspunde DOAR JSON valid, fără markdown:
 {
-  "summary": "2-4 propoziții în limba română",
+  "summary": "2-4 propoziții în limba cerută",
   "dailyTotals": {
     "calories": ${input.calories},
     "protein": ${input.proteinGrams},
@@ -5338,6 +6401,7 @@ export default {
   generateNicheVariants,
   generateNicheDiscover,
   generateICPDay,
+  translateNicheProfile,
   generateDailyIdea,
   generateMultiFormatIdea,
   structureUserIdea,

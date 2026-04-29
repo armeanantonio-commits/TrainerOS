@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Card from './Card';
 import Button from './Button';
 import { copyToClipboard } from '@/lib/utils';
+import { useI18n } from '@/hooks/useI18n';
 
 interface Scene {
   // Backend returns scenes as { scene, text, visual }
@@ -27,6 +28,7 @@ interface IdeaCardProps {
 }
 
 export default function IdeaCard({ idea }: IdeaCardProps) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState<string | null>(null);
   const format = (idea.format || 'REEL').toLowerCase();
   const normalizeSceneText = (value?: string) =>
@@ -77,7 +79,7 @@ export default function IdeaCard({ idea }: IdeaCardProps) {
                 size="sm"
                 onClick={() => handleCopy(idea.hook, 'hook')}
               >
-                {copied === 'hook' ? '✓ Copiat' : 'Copiază'}
+                {copied === 'hook' ? t('ideaDetail.copied') : t('common.copy')}
               </Button>
             </div>
             <p className="text-white text-lg font-medium">{idea.hook}</p>
@@ -86,7 +88,7 @@ export default function IdeaCard({ idea }: IdeaCardProps) {
           {/* Script */}
           <div className="mb-6">
             <h3 className="mb-3 text-sm font-semibold uppercase text-slate-300/72">
-              Script pe Scene
+              {t('ideaDetail.scriptScenes')}
             </h3>
             <div className="space-y-3">
               {displayScenes.map((scene, idx) => {
@@ -100,7 +102,7 @@ export default function IdeaCard({ idea }: IdeaCardProps) {
                     className="console-option p-4"
                   >
                     <span className="text-console-accent font-bold text-sm">
-                      Scenă {sceneNumber}
+                      {t('ideaDetail.sceneLabel', { number: sceneNumber })}
                     </span>
                     {sceneText && <p className="mt-1 text-slate-200">{sceneText}</p>}
                     {sceneVisual && (
@@ -120,7 +122,7 @@ export default function IdeaCard({ idea }: IdeaCardProps) {
       <div className="space-y-4">
         <Card className="border-cyan-300/28 bg-[linear-gradient(135deg,rgba(114,202,255,0.12),rgba(9,18,34,0.88))]">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-console-accent">
-            🎯 CTA RECOMANDAT
+            {t('ideaDetail.recommendedCta')}
           </h3>
           <p className="text-white font-medium mb-4">{idea.cta}</p>
           <Button
@@ -129,7 +131,7 @@ export default function IdeaCard({ idea }: IdeaCardProps) {
             className="w-full"
             onClick={() => handleCopy(idea.cta, 'cta')}
           >
-            {copied === 'cta' ? '✓ Copiat' : 'Copiază CTA'}
+            {copied === 'cta' ? t('ideaDetail.copied') : t('history.copyCta')}
           </Button>
         </Card>
 
@@ -138,7 +140,7 @@ export default function IdeaCard({ idea }: IdeaCardProps) {
         {idea.reasoning && (
           <Card>
             <h3 className="mb-3 text-sm font-semibold uppercase text-slate-300/72">
-              De ce funcționează
+              {t('ideaDetail.reasoning')}
             </h3>
             <p className="text-sm leading-relaxed text-slate-300/84">{idea.reasoning}</p>
           </Card>

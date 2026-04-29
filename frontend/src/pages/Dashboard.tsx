@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import SetupOnboardingModal from '@/components/SetupOnboardingModal';
+import { useI18n } from '@/hooks/useI18n';
+import { useLocalizedNicheProfile } from '@/hooks/useLocalizedNicheProfile';
 
 function PencilIcon() {
   return (
@@ -18,6 +20,7 @@ function PencilIcon() {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { language, t } = useI18n();
   const [isOnboardingDismissed, setIsOnboardingDismissed] = useState(false);
   const [showSetupCompletedBanner, setShowSetupCompletedBanner] = useState(false);
   const [isNicheModalOpen, setIsNicheModalOpen] = useState(false);
@@ -40,14 +43,16 @@ export default function Dashboard() {
   const stats = dashboardData?.stats;
   const recentActivity = dashboardData?.recentActivity;
   const profile = dashboardData?.profile;
-  const nicheDescription =
-    typeof profile?.positioningMessage === 'string' ? profile.positioningMessage.trim() : '';
-  const idealClientDetails =
-    typeof profile?.icpProfile === 'string'
-      ? profile.icpProfile.trim()
-      : profile?.icpProfile
-        ? JSON.stringify(profile.icpProfile, null, 2)
-        : '';
+  const localizedProfile = useLocalizedNicheProfile({
+    niche: profile?.niche,
+    icpProfile: profile?.icpProfile,
+    positioningMessage: profile?.positioningMessage,
+    enabled: !!profile,
+  });
+  const nicheDescription = localizedProfile.positioningMessage;
+  const idealClientDetails = localizedProfile.icpProfileText;
+  const displayedNiche = localizedProfile.niche || profile?.niche || '';
+  const dashboardLocale = language === 'en' ? 'en-US' : 'ro-RO';
   const hasNicheSetup = !!profile?.niche;
   const hasContentPreferences = !!user?.contentPreferences?.brandVoice || !!profile?.hasContentPreferences;
   const hasContentCreationPreferences =
@@ -115,6 +120,22 @@ export default function Dashboard() {
     !isOnboardingDismissed &&
     !isSetupComplete;
 
+  const getLocalizedObjective = (objective?: string | null) => {
+    if (!objective) {
+      return '';
+    }
+
+    const normalizedObjective = objective.trim().toLowerCase();
+    if (
+      normalizedObjective === 'generare lead-uri' ||
+      normalizedObjective === 'lead generation'
+    ) {
+      return t('dashboard.objective.leadGen');
+    }
+
+    return objective;
+  };
+
   return (
     <div className="min-h-screen overflow-x-hidden py-12">
       <SetupOnboardingModal
@@ -135,21 +156,21 @@ export default function Dashboard() {
           >
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <div className="min-w-0">
-                <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-slate-400">Nișa ta</p>
+                <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-slate-400">{t('dashboard.yourNiche')}</p>
               </div>
               <Button variant="outline" size="sm" onClick={() => setIsNicheModalOpen(false)}>
-                Închide
+                {t('common.close')}
               </Button>
             </div>
             <div className="min-w-0 rounded-[22px] border border-white/10 bg-white/[0.04] p-5">
               <p className="min-w-0 whitespace-pre-wrap break-all text-base font-semibold text-cyan-100 sm:text-lg">
-                {profile.niche}
+                {displayedNiche}
               </p>
             </div>
             {nicheDescription ? (
               <div className="mt-4 min-w-0 rounded-[22px] border border-white/10 bg-white/[0.04] p-5">
                 <p className="mb-2 text-[11px] font-mono uppercase tracking-[0.24em] text-slate-400">
-                  Descriere / Poziționare
+                  {t('dashboard.positioningMessage')}
                 </p>
                 <p className="min-w-0 whitespace-pre-wrap break-all text-sm text-slate-200 sm:text-base">
                   {nicheDescription}
@@ -159,7 +180,7 @@ export default function Dashboard() {
             {idealClientDetails ? (
               <div className="mt-4 min-w-0 rounded-[22px] border border-white/10 bg-white/[0.04] p-5">
                 <p className="mb-2 text-[11px] font-mono uppercase tracking-[0.24em] text-slate-400">
-                  Client Ideal
+                  {t('dashboard.idealClient')}
                 </p>
                 <p className="min-w-0 whitespace-pre-wrap break-all text-sm text-slate-200 sm:text-base">
                   {idealClientDetails}
@@ -175,14 +196,14 @@ export default function Dashboard() {
           <Card className="mb-6 border-emerald-300/25 bg-[linear-gradient(135deg,rgba(16,185,129,0.12),rgba(8,18,30,0.85))]">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="console-kicker mb-2">System Ready</p>
-                <h3 className="text-lg font-bold text-white font-display">Setup finalizat</h3>
+                <p className="console-kicker mb-2">{t('dashboard.systemReady')}</p>
+                <h3 className="text-lg font-bold text-white font-display">{t('dashboard.setupDone')}</h3>
                 <p className="text-slate-300/78 text-sm">
-                  Toți pașii de onboarding au fost salvați. Poți începe direct cu Daily Idea.
+                  {t('dashboard.setupDoneText')}
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => setShowSetupCompletedBanner(false)}>
-                Închide
+                {t('common.close')}
               </Button>
             </div>
           </Card>
@@ -191,9 +212,9 @@ export default function Dashboard() {
         <div className="console-panel-strong mb-8 overflow-hidden rounded-[34px] p-6 sm:p-8">
           <div className="mb-8 flex min-w-0 flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
-              <p className="console-kicker mb-3">Workspace Overview</p>
+              <p className="console-kicker mb-3">{t('dashboard.workspaceOverview')}</p>
               <h1 className="text-3xl font-bold text-white mb-2 font-display sm:text-4xl">
-                Bine ai venit, {user?.name || 'Antrenor'}
+                {t('dashboard.welcome', { name: user?.name || t('dashboard.coachFallback') })}
               </h1>
               {profile?.niche ? (
                 <div className="mt-4 flex min-w-0 w-full flex-wrap items-center gap-3">
@@ -210,18 +231,18 @@ export default function Dashboard() {
                     className="min-w-0 max-w-[calc(100vw-4.5rem)] overflow-hidden rounded-[18px] border border-cyan-300/18 bg-white/[0.04] px-3 py-2.5 text-left transition hover:border-cyan-300/28 hover:bg-white/[0.06] sm:max-w-full sm:rounded-[20px] sm:px-4 sm:py-3"
                     aria-haspopup="dialog"
                     aria-expanded={isNicheModalOpen}
-                    title="Arată nișa completă"
+                    title={t('dashboard.yourNiche')}
                   >
-                    <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-slate-400">Nișa ta</p>
+                    <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-slate-400">{t('dashboard.yourNiche')}</p>
                     <div className="mt-1 flex min-w-0 items-start gap-3">
                       <p className="min-w-0 flex-1 truncate text-sm font-semibold text-cyan-100 sm:text-lg">
-                        {profile.niche}
+                        {displayedNiche}
                       </p>
                       <Link
                         to="/niche-finder"
                         className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-slate-300 transition hover:border-cyan-300/28 hover:bg-white/[0.08] hover:text-white"
-                        aria-label="Editează nișa"
-                        title="Editează nișa"
+                        aria-label={t('dashboard.editNiche')}
+                        title={t('dashboard.editNiche')}
                         onClick={(event) => event.stopPropagation()}
                       >
                         <PencilIcon />
@@ -233,26 +254,26 @@ export default function Dashboard() {
             </div>
             <Link to="/settings" className="shrink-0 self-start">
               <Button variant="outline" className="flex items-center gap-2">
-                Setări
+                {t('dashboard.settings')}
               </Button>
             </Link>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
-              <p className="console-kicker mb-3">Idei generate</p>
+              <p className="console-kicker mb-3">{t('dashboard.generatedIdeas')}</p>
               <div className="text-4xl font-bold text-white">{isLoading ? '...' : stats?.totalIdeas || 0}</div>
-              <p className="mt-2 text-xs text-slate-400">{isLoading ? '...' : `${stats?.ideasThisMonth || 0} luna aceasta`}</p>
+              <p className="mt-2 text-xs text-slate-400">{isLoading ? '...' : `${stats?.ideasThisMonth || 0} ${t('dashboard.thisMonth')}`}</p>
             </div>
             <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
-              <p className="console-kicker mb-3">Content analizat</p>
+              <p className="console-kicker mb-3">{t('dashboard.contentAnalyzed')}</p>
               <div className="text-4xl font-bold text-white">{isLoading ? '...' : stats?.totalFeedbacks || 0}</div>
-              <p className="mt-2 text-xs text-slate-400">{isLoading ? '...' : `${stats?.feedbacksThisMonth || 0} luna aceasta`}</p>
+              <p className="mt-2 text-xs text-slate-400">{isLoading ? '...' : `${stats?.feedbacksThisMonth || 0} ${t('dashboard.thisMonth')}`}</p>
             </div>
             <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
-              <p className="console-kicker mb-3">Streak zilnic</p>
+              <p className="console-kicker mb-3">{t('dashboard.dailyStreak')}</p>
               <div className="text-4xl font-bold text-white">{isLoading ? '...' : `${stats?.streak || 0} 🔥`}</div>
-              <p className="mt-2 text-xs text-slate-400">zile consecutive active</p>
+              <p className="mt-2 text-xs text-slate-400">{t('dashboard.activeDays')}</p>
             </div>
           </div>
         </div>
@@ -266,13 +287,13 @@ export default function Dashboard() {
               </div>
               <div className="flex-grow">
                 <h3 className="text-xl font-bold text-white mb-2 font-display">
-                  Completează-ți profilul pentru rezultate mai bune!
+                  {t('dashboard.completeProfileTitle')}
                 </h3>
                 <p className="mb-4 text-slate-300/78">
-                  AI-ul va genera content mult mai relevant dacă știe nișa ta. Durează doar 2 minute.
+                  {t('dashboard.completeProfileText')}
                 </p>
                 <Link to="/niche-finder">
-                  <Button>🎯 Setează Nișa Acum →</Button>
+                  <Button>🎯 {t('dashboard.setNicheNow')}</Button>
                 </Link>
               </div>
             </div>
@@ -288,14 +309,13 @@ export default function Dashboard() {
               </div>
               <div className="flex-grow">
                 <h3 className="text-xl font-bold text-white mb-2 font-display">
-                  Setează-ți Brand Voice-ul
+                  {t('dashboard.setBrandVoice')}
                 </h3>
                 <p className="mb-4 text-slate-300/78">
-                  Completezi o singură dată tonul, stilul și principiile tale, iar ideile zilnice vor
-                  suna ca tine.
+                  {t('dashboard.setBrandVoiceText')}
                 </p>
                 <Link to="/content-preferences">
-                  <Button>🗣️ Completează Brand Voice →</Button>
+                  <Button>🗣️ {t('dashboard.completeBrandVoice')}</Button>
                 </Link>
               </div>
             </div>
@@ -315,11 +335,11 @@ export default function Dashboard() {
                     Daily Idea
                   </h3>
                   <p className="text-slate-300/74 text-sm">
-                    Generează ideea zilnică de content
+                    {t('dashboard.dailyIdeaDesc')}
                   </p>
                   {stats?.ideasThisWeek !== undefined && stats.ideasThisWeek > 0 && (
                     <p className="text-cyan-200 text-xs mt-2">
-                      {stats.ideasThisWeek} generate săptămâna aceasta
+                      {t('dashboard.generatedThisWeek', { count: stats.ideasThisWeek })}
                     </p>
                   )}
                 </div>
@@ -338,10 +358,10 @@ export default function Dashboard() {
                     Niche Finder
                   </h3>
                   <p className="text-slate-300/74 text-sm">
-                    Clarifică-ți nișa și, opțional, clientul ideal
+                    {t('dashboard.nicheFinderDesc')}
                   </p>
                   <p className="text-cyan-200 text-xs mt-2">
-                    {hasNicheSetup ? '✓ Profil completat' : '⚠️ Profil nesetat'}
+                    {hasNicheSetup ? t('dashboard.profileComplete') : t('dashboard.profileMissing')}
                   </p>
                 </div>
               </div>
@@ -359,11 +379,11 @@ export default function Dashboard() {
                     Content Review
                   </h3>
                   <p className="text-slate-300/74 text-sm">
-                    Analizează postările tale
+                    {t('dashboard.contentReviewDesc')}
                   </p>
                   {stats?.avgOverallScore !== undefined && stats.avgOverallScore > 0 && (
                     <p className="text-cyan-200 text-xs mt-2">
-                      Scor mediu: {stats.avgOverallScore}/100
+                      {t('dashboard.avgScore', { score: stats.avgOverallScore })}
                     </p>
                   )}
                 </div>
@@ -382,10 +402,10 @@ export default function Dashboard() {
                     Brand Voice
                   </h3>
                   <p className="text-slate-300/74 text-sm">
-                    Setează tonul tău, stilul și CTA-ul pe care le folosești constant
+                    {t('dashboard.brandVoiceDesc')}
                   </p>
                   <p className="text-cyan-200 text-xs mt-2">
-                    {hasContentPreferences ? '✓ Brand Voice setat' : '⚠️ Brand Voice nesetat'}
+                    {hasContentPreferences ? t('dashboard.brandVoiceSet') : t('dashboard.brandVoiceMissing')}
                   </p>
                 </div>
               </div>
@@ -400,12 +420,12 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-white mb-2 font-display">
-                    Structurează Ideea
+                    {t('dashboard.ideaStructurer')}
                   </h3>
                   <p className="text-slate-300/74 text-sm">
-                    Pui ideea brută, iar AI-ul o transformă în Hook → Script → CTA
+                    {t('dashboard.ideaStructurerDesc')}
                   </p>
-                  <p className="text-brand-500 text-xs mt-2">Nou</p>
+                  <p className="text-brand-500 text-xs mt-2">{t('dashboard.new')}</p>
                 </div>
               </div>
             </Card>
@@ -419,10 +439,10 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-white mb-2 font-display">
-                    Cum vrei să creezi content?
+                    {t('dashboard.contentCreation')}
                   </h3>
                   <p className="text-slate-300/74 text-sm">
-                    Setează stilul tău de filmare și formatul natural de livrare
+                    {t('dashboard.contentCreationDesc')}
                   </p>
                 </div>
               </div>
@@ -440,14 +460,14 @@ export default function Dashboard() {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="text-xl font-bold text-white font-display">
-                    Generare Nutriție Client
+                    {t('dashboard.nutritionTitle')}
                   </h3>
                 </div>
                 <p className="text-slate-300/74 text-sm">
-                  Modulul de nutriție este încă în lucru. Va reveni ca feature dedicat după ce finalizăm fluxul complet.
+                  {t('dashboard.nutritionDesc')}
                 </p>
                 <span className="inline-block mt-2 px-3 py-1 bg-white/10 text-slate-300 text-xs font-semibold rounded-full">
-                  Upcoming
+                  {t('nav.upcoming')}
                 </span>
               </div>
             </div>
@@ -462,15 +482,14 @@ export default function Dashboard() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="text-xl font-bold text-white font-display">
-                      Email Marketing AI
+                      {t('dashboard.emailMarketingTitle')}
                     </h3>
                   </div>
                   <p className="text-slate-300/74 text-sm">
-                    Generezi emailuri de nurture și sales pe baza contextului tău global (nișă, ICP,
-                    poziționare și ofertă).
+                    {t('dashboard.emailMarketingDesc')}
                   </p>
                   <span className="inline-block mt-2 px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-semibold rounded-full">
-                    Nou
+                    {t('dashboard.new')}
                   </span>
                 </div>
               </div>
@@ -486,15 +505,14 @@ export default function Dashboard() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="text-xl font-bold text-white font-display">
-                      TrainerOS Chat
+                      {t('dashboard.chatTitle')}
                     </h3>
                   </div>
                   <p className="text-gray-300 text-sm">
-                    Vorbești în timp real cu expertul tău AI de marketing fitness pentru idei, hook-uri,
-                    CTA și strategii de content.
+                    {t('dashboard.chatDesc')}
                   </p>
                   <span className="inline-block mt-2 px-3 py-1 bg-brand-500/20 text-brand-500 text-xs font-semibold rounded-full">
-                    Live Streaming
+                    {t('dashboard.liveNow')}
                   </span>
                 </div>
               </div>
@@ -507,16 +525,16 @@ export default function Dashboard() {
           {/* Recent Ideas */}
           <Card>
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-white font-display">Idei Recente</h3>
+              <h3 className="text-xl font-bold text-white font-display">{t('dashboard.recentIdeas')}</h3>
               <Link to="/idea-history">
                 <Button variant="outline" size="sm">
-                  Vezi Toate →
+                  {t('dashboard.viewAll')}
                 </Button>
               </Link>
             </div>
 
             {isLoading ? (
-              <div className="text-center py-8 text-slate-400">Se încarcă...</div>
+              <div className="text-center py-8 text-slate-400">{t('dashboard.loading')}</div>
             ) : recentActivity?.ideas && recentActivity.ideas.length > 0 ? (
               <div className="space-y-3">
                 {recentActivity.ideas.map((idea: any, index: number) => (
@@ -533,12 +551,12 @@ export default function Dashboard() {
                           </p>
                           {idea.objective && (
                             <p className="text-slate-500 text-xs mt-1">
-                              🎯 {idea.objective}
+                              🎯 {getLocalizedObjective(idea.objective)}
                             </p>
                           )}
                         </div>
                         <span className="text-xs text-slate-500 whitespace-nowrap">
-                          {new Date(idea.createdAt).toLocaleDateString('ro-RO', {
+                          {new Date(idea.createdAt).toLocaleDateString(dashboardLocale, {
                             day: 'numeric',
                             month: 'short',
                           })}
@@ -550,7 +568,7 @@ export default function Dashboard() {
                         </span>
                         {/* conversion hidden */}
                         {idea.used && (
-                          <span className="text-xs text-cyan-200 font-semibold">✓ Folosită</span>
+                          <span className="text-xs text-cyan-200 font-semibold">{t('dashboard.used')}</span>
                         )}
                       </div>
                     </div>
@@ -559,9 +577,9 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <p className="text-slate-400 mb-4">Nicio idee generată încă</p>
+                <p className="text-slate-400 mb-4">{t('dashboard.noIdeasYet')}</p>
                 <Link to="/daily-idea">
-                  <Button size="sm">Generează Prima Idee →</Button>
+                  <Button size="sm">{t('dashboard.generateFirstIdea')}</Button>
                 </Link>
               </div>
             )}
@@ -570,16 +588,16 @@ export default function Dashboard() {
           {/* Recent Content Reviews */}
           <Card>
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-white font-display">Content Analizat Recent</h3>
+              <h3 className="text-xl font-bold text-white font-display">{t('dashboard.recentReviewedContent')}</h3>
               <Link to="/content-review">
                 <Button variant="outline" size="sm">
-                  Analizează →
+                  {t('dashboard.analyze')}
                 </Button>
               </Link>
             </div>
 
             {isLoading ? (
-              <div className="text-center py-8 text-slate-400">Se încarcă...</div>
+              <div className="text-center py-8 text-slate-400">{t('dashboard.loading')}</div>
             ) : recentActivity?.feedbacks && recentActivity.feedbacks.length > 0 ? (
               <div className="space-y-3">
                 {recentActivity.feedbacks.map((feedback: any, index: number) => (
@@ -595,7 +613,7 @@ export default function Dashboard() {
                             📄 {feedback.fileName}
                           </p>
                           <p className="text-slate-500 text-xs mt-1">
-                            {new Date(feedback.createdAt).toLocaleDateString('ro-RO', {
+                            {new Date(feedback.createdAt).toLocaleDateString(dashboardLocale, {
                               day: 'numeric',
                               month: 'short',
                             })}
@@ -610,7 +628,7 @@ export default function Dashboard() {
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-400 w-20">Claritate</span>
+                          <span className="text-xs text-slate-400 w-20">{t('dashboard.clarity')}</span>
                           <div className="flex-grow rounded-full h-2 overflow-hidden bg-white/8">
                             <div
                               className="h-full rounded-full bg-[linear-gradient(90deg,#8CF8D4,#72CAFF)] transition-all"
@@ -640,9 +658,9 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <p className="text-slate-400 mb-4">Niciun content analizat încă</p>
+                <p className="text-slate-400 mb-4">{t('dashboard.noAnalyzedContentYet')}</p>
                 <Link to="/content-review">
-                  <Button size="sm">Analizează Content →</Button>
+                  <Button size="sm">{t('dashboard.analyzeContent')}</Button>
                 </Link>
               </div>
             )}

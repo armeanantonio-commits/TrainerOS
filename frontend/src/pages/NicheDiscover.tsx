@@ -4,6 +4,7 @@ import { nicheAPI } from '@/services/api';
 import Button from '@/components/Button';
 import Card from '@/components/Card';
 import { useAuth } from '@/contexts/AuthContext';
+import { useI18n } from '@/hooks/useI18n';
 
 interface PhaseAData {
   // A1: Gender preference
@@ -72,9 +73,148 @@ function splitRichTextSections(value: string): string[] {
     .filter(Boolean);
 }
 
+const nicheDiscoverTextMap: Record<string, string> = {
+  'Află Nișa Ta': 'Discover Your Niche',
+  'Descoperă direcția perfectă pentru tine — pas cu pas': 'Find the right direction for you, step by step',
+  'Descoperire': 'Discovery',
+  'Propunere': 'Proposal',
+  'Rafinare': 'Refinement',
+  'Faza A': 'Phase A',
+  'Faza C': 'Phase C',
+  'Pas': 'Step',
+  'din': 'of',
+  'Înapoi': 'Back',
+  'Înapoi la Faza A': 'Back to Phase A',
+  'Continuă': 'Continue',
+  'Continuă cu Această Variantă →': 'Continue with This Option →',
+  'Generez variante...': 'Generating options...',
+  'Generează Variante →': 'Generate Options →',
+  'Generez Niche Builder Final...': 'Generating Final Niche Builder...',
+  'Generează Niche Builder →': 'Generate Niche Builder →',
+  'Reia Quizul': 'Restart Quiz',
+  'Niche Builder generat și salvat automat în cont.': 'Niche Builder generated and saved to your account automatically.',
+  'Nișa': 'Niche',
+  'Client Ideal': 'Ideal Client',
+  'Poziționare': 'Positioning',
+  'Cine este': 'Who they are',
+  'Cum arată ziua ei': 'What their day looks like',
+  'Ce o blochează': 'What blocks them',
+  'Ce își dorește': 'What they want',
+  'De ce nu au mers alte soluții': 'Why other solutions did not work',
+  'Ce o face diferită': 'What makes them different',
+  'Mesaj central': 'Core message',
+  'Cum te diferențiezi': 'How you differentiate',
+  'Promisiunea ta': 'Your promise',
+  'Punctul': 'Point',
+  'Alege o variantă': 'Choose an option',
+  'Selectează cu cine rezonezi cel mai mult (femei, bărbați sau ambele).': 'Select who you resonate with most naturally (women, men, or both).',
+  'Selectează cel puțin un interval de vârstă.': 'Select at least one age range.',
+  'Selectează cel puțin o situație unde aduci valoare.': 'Select at least one situation where you bring value.',
+  'Selectează cel puțin o problemă comună.': 'Select at least one common problem.',
+  'Alege un obiectiv principal sau completează câmpul opțional.': 'Choose a main outcome or complete the optional field.',
+  'Selectează nivelul dominant de awareness.': 'Select the dominant awareness level.',
+  'Selectează povestea dominantă pe care și-o spun.': 'Select the dominant story they tell themselves.',
+  'Selectează povestea dominantă de identitate.': 'Select the dominant identity story.',
+  'Selectează cel puțin un obiectiv dominant.': 'Select at least one dominant goal.',
+  'Pe baza răspunsurilor tale, asta pare direcția cea mai potrivită pentru tine acum:': 'Based on your answers, this looks like the best direction for you right now:',
+  'Alege varianta care crezi că se potrivește cel mai bine pentru tine. Nu e o decizie finală. Hai să o rafinăm rapid ca să pot crea content foarte precis.': 'Choose the option that feels like the best fit for you. This is not final. We will refine it quickly so the content can become very precise.',
+  'Generez cele 3 variante de nișă...': 'Generating the 3 niche options...',
+  'Mai multe detalii despre situația lor': 'More details about their situation',
+  'Nu ai selectat nicio situație specifică la pasul anterior.': 'You did not select any specific situation in the previous step.',
+  'Poți continua mai departe.': 'You can continue.',
+  'Eroare la generare variante:': 'Error generating options:',
+  'Eroare:': 'Error:',
+  'Ceva nu a mers bine': 'Something went wrong',
+  'Varianta': 'Option',
+  'Femei': 'Women',
+  'Bărbați': 'Men',
+  'Rezonez la fel cu ambele': 'I resonate equally with both',
+  'Când oamenii sunt ocupați și dezorganizați': 'When people are busy and disorganized',
+  'Când vor estetic, dar nu se țin': 'When they want aesthetic results but cannot stay consistent',
+  'Când sunt la început și au nevoie de ghidaj': 'When they are just starting and need guidance',
+  'Când știu ce să facă, dar nu au structură': 'When they know what to do, but have no structure',
+  'Când au dureri sau limitări și le e frică să înceapă': 'When they have pain or limitations and are afraid to start',
+  'Lipsa de consecvență': 'Lack of consistency',
+  'Lipsa de energie': 'Lack of energy',
+  'Confuzia (nu știu ce să fac)': 'Confusion (they do not know what to do)',
+  'Alimentația haotică': 'Chaotic eating',
+  'Frica / rușinea de sală': 'Fear / embarrassment about the gym',
+  'Să se țină constant': 'Stay consistent',
+  'Să slăbească': 'Lose fat',
+  'Să se tonifieze / să arate mai bine': 'Tone up / look better',
+  'Să aibă mai multă energie': 'Have more energy',
+  'Să scape de dureri': 'Get rid of pain',
+  'Promisiuni rapide / rezultate peste noapte': 'Fast promises / overnight results',
+  'Motivare agresivă / rușinare': 'Aggressive motivation / shaming',
+  'Conținut extrem (dietă, antrenamente)': 'Extreme content (diet, workouts)',
+  'Prea tehnic / rigid': 'Too technical / rigid',
+  'Prea soft, fără rezultate reale': 'Too soft, without real results',
+  'Știu ce greșesc, dar nu aplică': 'They know what they are doing wrong, but they do not apply it',
+  'Știu că au o problemă, dar nu știu soluția': 'They know they have a problem, but they do not know the solution',
+  'Cred că fac bine, dar nu au rezultate': 'They think they are doing things right, but they get no results',
+  'Nu știu exact unde greșesc': 'They do not know exactly where they are going wrong',
+  'Nu sunt disciplinat.': 'I am not disciplined.',
+  'Nu am voință.': 'I do not have willpower.',
+  'Nu am timp pentru mine.': 'I do not have time for myself.',
+  'Nu sunt genul care reușește.': 'I am not the kind of person who succeeds.',
+  'Mă las mereu.': 'I always quit.',
+  '„Știu ce ar trebui să fac, dar nu mă țin."': '"I know what I should do, but I do not stick to it."',
+  '„Simt că m-am lăsat."': '"I feel like I have let myself go."',
+  '„Am mai încercat și m-am oprit."': '"I have tried before and then stopped."',
+  '„Nu mai am energie pentru mine."': '"I do not have energy left for myself."',
+  'Slăbit': 'Fat loss',
+  'Tonifiere / estetic': 'Toning / aesthetics',
+  'Energie': 'Energy',
+  'Disciplină / consecvență': 'Discipline / consistency',
+  'Dureri / disconfort': 'Pain / discomfort',
+  'Sedentar': 'Sedentary',
+  'Activ': 'Active',
+  'Mixt': 'Mixed',
+  'mănâncă acasă': 'eat at home',
+  'cafea pe stomacul gol': 'coffee on an empty stomach',
+  'snack rapid / patiserie': 'quick snack / pastry',
+  'gătit': 'home-cooked',
+  'comandă': 'orders in',
+  'mănâncă pe fugă': 'eats on the go',
+  'prea obosiți pentru sală': 'too tired for the gym',
+  'au timp, dar fără energie': 'they have time, but no energy',
+  'se antrenează rar': 'they train rarely',
+  'Au copii': 'They have children',
+  'Sunt deja activi / merg la sală': 'They are already active / go to the gym',
+  'Au un job foarte solicitant fizic': 'They have a very physically demanding job',
+  'Lucrează în ture / program neregulat': 'They work shifts / have an irregular schedule',
+  'Au dureri / limitări fizice': 'They have pain / physical limitations',
+  'Niciuna dintre cele de mai sus': 'None of the above',
+  'se trezesc foarte devreme': 'they wake up very early',
+  'mesele sunt haotice': 'their meals are chaotic',
+  'timpul pentru ei e seara târziu': 'their free time is late in the evening',
+  'oboseala e principalul obstacol': 'fatigue is the main obstacle',
+  'merg constant, dar fără rezultate': 'they train consistently, but without results',
+  'merg haotic': 'they train inconsistently',
+  'știu exercițiile, dar nu structura': 'they know the exercises, but not the structure',
+  'se plafonează ușor': 'they plateau easily',
+  'oboseală cronică': 'chronic fatigue',
+  'dureri': 'pain',
+  'program imprevizibil': 'unpredictable schedule',
+  'alimentație dezorganizată': 'disorganized eating',
+  'spate': 'back',
+  'genunchi': 'knees',
+  'umeri': 'shoulders',
+  'șolduri': 'hips',
+};
+
+function translateNicheDiscoverText(language: 'ro' | 'en', value: string): string {
+  if (language !== 'en') {
+    return value;
+  }
+
+  return nicheDiscoverTextMap[value] || value;
+}
+
 export default function NicheDiscover() {
   const queryClient = useQueryClient();
   const { refreshUser } = useAuth();
+  const { language } = useI18n();
   const normalizeText = (value: string) =>
     value
       .toLowerCase()
@@ -183,24 +323,25 @@ export default function NicheDiscover() {
     ? splitRichTextSections(generatedResult.positioning)
     : [];
   const idealClientLabels = [
-    'Cine este',
-    'Cum arată ziua ei',
-    'Ce o blochează',
-    'Ce își dorește',
-    'De ce nu au mers alte soluții',
-    'Ce o face diferită',
+    translateNicheDiscoverText(language, 'Cine este'),
+    translateNicheDiscoverText(language, 'Cum arată ziua ei'),
+    translateNicheDiscoverText(language, 'Ce o blochează'),
+    translateNicheDiscoverText(language, 'Ce își dorește'),
+    translateNicheDiscoverText(language, 'De ce nu au mers alte soluții'),
+    translateNicheDiscoverText(language, 'Ce o face diferită'),
   ];
   const positioningLabels = [
-    'Mesaj central',
-    'Cum te diferențiezi',
-    'Promisiunea ta',
+    translateNicheDiscoverText(language, 'Mesaj central'),
+    translateNicheDiscoverText(language, 'Cum te diferențiezi'),
+    translateNicheDiscoverText(language, 'Promisiunea ta'),
   ];
+  const lt = (value: string) => translateNicheDiscoverText(language, value);
 
   const extractVariants = (response: any): NicheVariant[] =>
     (Array.isArray(response?.data?.variants) ? response.data.variants : [])
       .map((variant: { variant?: string; title?: string; description?: string }, index: number) => ({
         id: index + 1,
-        title: (variant.variant || variant.title || '').trim() || `Varianta ${index + 1}`,
+        title: (variant.variant || variant.title || '').trim() || `${lt('Varianta')} ${index + 1}`,
         description: (variant.description || '').trim(),
       }))
       .filter((variant: NicheVariant) => variant.title.length > 0)
@@ -219,13 +360,16 @@ export default function NicheDiscover() {
         const index = padded.length + 1;
         padded.push({
           id: index,
-          title: `Varianta ${index}`,
-          description: 'Nu am primit descrierea completă pentru această variantă, dar o poți selecta și rafina mai departe.',
+          title: `${lt('Varianta')} ${index}`,
+          description:
+            language === 'en'
+              ? 'The full description did not come back for this option, but you can still select it and refine it further.'
+              : 'Nu am primit descrierea completă pentru această variantă, dar o poți selecta și rafina mai departe.',
         });
       }
 
       if (!padded.length) {
-        setPhaseAError('Nu am primit variante valide. Încearcă din nou.');
+        setPhaseAError(language === 'en' ? 'No valid options were returned. Try again.' : 'Nu am primit variante valide. Încearcă din nou.');
         return;
       }
       setSelectedVariant(null);
@@ -273,23 +417,23 @@ export default function NicheDiscover() {
   const handlePhaseAComplete = () => {
     const payload = buildPhaseAPayload(phaseAData);
     if (!payload.gender) {
-      setPhaseAError('Selectează cu cine rezonezi cel mai mult (femei, bărbați sau ambele).');
+      setPhaseAError(lt('Selectează cu cine rezonezi cel mai mult (femei, bărbați sau ambele).'));
       return;
     }
     if (!payload.ageRanges.length) {
-      setPhaseAError('Selectează cel puțin un interval de vârstă.');
+      setPhaseAError(lt('Selectează cel puțin un interval de vârstă.'));
       return;
     }
     if (!payload.valueSituations.length) {
-      setPhaseAError('Selectează cel puțin o situație unde aduci valoare.');
+      setPhaseAError(lt('Selectează cel puțin o situație unde aduci valoare.'));
       return;
     }
     if (!payload.commonProblems.length) {
-      setPhaseAError('Selectează cel puțin o problemă comună.');
+      setPhaseAError(lt('Selectează cel puțin o problemă comună.'));
       return;
     }
     if (!payload.primaryOutcome || payload.primaryOutcome.length < 2) {
-      setPhaseAError('Alege un obiectiv principal sau completează câmpul opțional.');
+      setPhaseAError(lt('Alege un obiectiv principal sau completează câmpul opțional.'));
       return;
     }
 
@@ -300,7 +444,7 @@ export default function NicheDiscover() {
 
   const handleSelectVariant = () => {
     if (selectedVariant === null) {
-      alert('Alege o variantă');
+      alert(lt('Alege o variantă'));
       return;
     }
     setPhase('C');
@@ -310,15 +454,15 @@ export default function NicheDiscover() {
 
   const handlePhaseCNext = () => {
     if (stepC === 1 && !phaseCData.awarenessLevel) {
-      setPhaseCError('Selectează nivelul dominant de awareness.');
+      setPhaseCError(lt('Selectează nivelul dominant de awareness.'));
       return;
     }
     if (stepC === 2 && !phaseCData.identityStory) {
-      setPhaseCError('Selectează povestea dominantă pe care și-o spun.');
+      setPhaseCError(lt('Selectează povestea dominantă pe care și-o spun.'));
       return;
     }
     if (stepC === 4 && phaseCData.dominantGoals.length === 0) {
-      setPhaseCError('Selectează cel puțin un obiectiv dominant.');
+      setPhaseCError(lt('Selectează cel puțin un obiectiv dominant.'));
       return;
     }
 
@@ -328,22 +472,22 @@ export default function NicheDiscover() {
 
   const handleSubmit = () => {
     if (selectedVariant === null) {
-      alert('Alege o variantă');
+      alert(lt('Alege o variantă'));
       return;
     }
 
     const phaseAPayload = buildPhaseAPayload(phaseAData);
     const selected = nicheVariants[selectedVariant - 1];
     if (!phaseCData.awarenessLevel) {
-      setPhaseCError('Selectează nivelul dominant de awareness.');
+      setPhaseCError(lt('Selectează nivelul dominant de awareness.'));
       return;
     }
     if (!phaseCData.identityStory) {
-      setPhaseCError('Selectează povestea dominantă de identitate.');
+      setPhaseCError(lt('Selectează povestea dominantă de identitate.'));
       return;
     }
     if (phaseCData.dominantGoals.length === 0) {
-      setPhaseCError('Selectează cel puțin un obiectiv dominant.');
+      setPhaseCError(lt('Selectează cel puțin un obiectiv dominant.'));
       return;
     }
 
@@ -408,10 +552,10 @@ export default function NicheDiscover() {
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-4 font-display">
-            Află Nișa Ta
+            {lt('Află Nișa Ta')}
           </h1>
           <p className="text-gray-300">
-            Descoperă direcția perfectă pentru tine — pas cu pas
+            {lt('Descoperă direcția perfectă pentru tine — pas cu pas')}
           </p>
         </div>
 
@@ -422,21 +566,21 @@ export default function NicheDiscover() {
               <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${phase === 'A' ? 'border-brand-500 bg-brand-500/20' : phase === 'B' || phase === 'C' || phase === 'D' ? 'border-green-500 bg-green-500/20' : 'border-gray-500'}`}>
                 A
               </div>
-              <span className="font-semibold">Descoperire</span>
+              <span className="font-semibold">{lt('Descoperire')}</span>
             </div>
             <div className="w-8 h-0.5 bg-gray-600" />
             <div className={`flex items-center gap-2 ${phase === 'B' ? 'text-brand-500' : phase === 'C' || phase === 'D' ? 'text-green-500' : 'text-gray-500'}`}>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${phase === 'B' ? 'border-brand-500 bg-brand-500/20' : phase === 'C' || phase === 'D' ? 'border-green-500 bg-green-500/20' : 'border-gray-500'}`}>
                 B
               </div>
-              <span className="font-semibold">Propunere</span>
+              <span className="font-semibold">{lt('Propunere')}</span>
             </div>
             <div className="w-8 h-0.5 bg-gray-600" />
             <div className={`flex items-center gap-2 ${phase === 'C' || phase === 'D' ? 'text-brand-500' : 'text-gray-500'}`}>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${phase === 'C' || phase === 'D' ? 'border-brand-500 bg-brand-500/20' : 'border-gray-500'}`}>
                 C
               </div>
-              <span className="font-semibold">Rafinare</span>
+              <span className="font-semibold">{lt('Rafinare')}</span>
             </div>
           </div>
         </div>
@@ -450,7 +594,7 @@ export default function NicheDiscover() {
                 style={{ width: `${(stepA / 6) * 100}%` }}
               />
             </div>
-            <p className="text-center text-gray-500 mt-2 text-sm">Faza A - Pas {stepA} din 6</p>
+            <p className="text-center text-gray-500 mt-2 text-sm">{lt('Faza A')} - {lt('Pas')} {stepA} {lt('din')} 6</p>
           </div>
         )}
 
@@ -463,7 +607,7 @@ export default function NicheDiscover() {
                 style={{ width: `${(stepC / 7) * 100}%` }}
               />
             </div>
-            <p className="text-center text-gray-500 mt-2 text-sm">Faza C - Pas {stepC} din 7</p>
+            <p className="text-center text-gray-500 mt-2 text-sm">{lt('Faza C')} - {lt('Pas')} {stepC} {lt('din')} 7</p>
           </div>
         )}
 
@@ -480,7 +624,9 @@ export default function NicheDiscover() {
               {stepA === 1 && (
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    A1. Cu ce tip de oameni simți că rezonezi cel mai natural când lucrezi?
+                    {language === 'en'
+                      ? 'A1. Which type of people do you naturally resonate with most when you work with them?'
+                      : 'A1. Cu ce tip de oameni simți că rezonezi cel mai natural când lucrezi?'}
                   </h2>
                   <div className="space-y-3">
                     {['Femei', 'Bărbați', 'Rezonez la fel cu ambele'].map((option) => (
@@ -494,7 +640,7 @@ export default function NicheDiscover() {
                           onChange={() => toggleArrayA('genderPreference', option)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white">{option}</span>
+                        <span className="text-white">{lt(option)}</span>
                       </label>
                     ))}
                   </div>
@@ -505,7 +651,9 @@ export default function NicheDiscover() {
               {stepA === 2 && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    A2. Când lucrurile merg bine cu clienții tăi, cam ce vârstă au?
+                    {language === 'en'
+                      ? 'A2. When things go well with your clients, what age range do they usually fall into?'
+                      : 'A2. Când lucrurile merg bine cu clienții tăi, cam ce vârstă au?'}
                   </h2>
                   <div className="space-y-3">
                     {['18–25', '25–35', '35–45', '45+'].map((age) => (
@@ -525,7 +673,7 @@ export default function NicheDiscover() {
                   </div>
                   <div>
                     <label className="block text-gray-300 mb-2 text-sm">
-                      Alt interval de vârstă (opțional)
+                      {language === 'en' ? 'Another age range (optional)' : 'Alt interval de vârstă (opțional)'}
                     </label>
                     <input
                       type="text"
@@ -534,7 +682,7 @@ export default function NicheDiscover() {
                         setPhaseAData({ ...phaseAData, customAgeRange: e.target.value })
                       }
                       className="w-full bg-dark-300 text-white rounded-lg p-3"
-                      placeholder="ex: 30-40"
+                      placeholder={language === 'en' ? 'ex: 30-40' : 'ex: 30-40'}
                     />
                   </div>
                 </div>
@@ -544,7 +692,9 @@ export default function NicheDiscover() {
               {stepA === 3 && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    A3. În ce situații simți că aduci cea mai mare valoare ca antrenor?
+                    {language === 'en'
+                      ? 'A3. In which situations do you feel you bring the most value as a coach?'
+                      : 'A3. În ce situații simți că aduci cea mai mare valoare ca antrenor?'}
                   </h2>
                   <div className="space-y-3">
                     {[
@@ -564,13 +714,15 @@ export default function NicheDiscover() {
                           onChange={() => toggleArrayA('valueSituations', situation)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white">{situation}</span>
+                        <span className="text-white">{lt(situation)}</span>
                       </label>
                     ))}
                   </div>
                   <div>
                     <label className="block text-gray-300 mb-2 text-sm">
-                      Alt tip de situație în care te simți foarte util? (opțional)
+                      {language === 'en'
+                        ? 'Another type of situation where you feel especially useful? (optional)'
+                        : 'Alt tip de situație în care te simți foarte util? (opțional)'}
                     </label>
                     <input
                       type="text"
@@ -579,7 +731,7 @@ export default function NicheDiscover() {
                         setPhaseAData({ ...phaseAData, valueSituationsOther: e.target.value })
                       }
                       className="w-full bg-dark-300 text-white rounded-lg p-3"
-                      placeholder="ex: când au încercat multe și nimic nu a funcționat..."
+                      placeholder={language === 'en' ? 'ex: when they have tried many things and nothing worked...' : 'ex: când au încercat multe și nimic nu a funcționat...'}
                     />
                   </div>
                 </div>
@@ -589,7 +741,9 @@ export default function NicheDiscover() {
               {stepA === 4 && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    A4. Ce problemă explici cel mai des oamenilor, aproape zilnic?
+                    {language === 'en'
+                      ? 'A4. What problem do you explain to people most often, almost every day?'
+                      : 'A4. Ce problemă explici cel mai des oamenilor, aproape zilnic?'}
                   </h2>
                   <div className="space-y-3">
                     {[
@@ -609,13 +763,13 @@ export default function NicheDiscover() {
                           onChange={() => toggleArrayA('commonProblems', problem)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white">{problem}</span>
+                        <span className="text-white">{lt(problem)}</span>
                       </label>
                     ))}
                   </div>
                   <div>
                     <label className="block text-gray-300 mb-2 text-sm">
-                      Cum o spui tu, pe scurt? (opțional)
+                      {language === 'en' ? 'How would you say it in your own words? (optional)' : 'Cum o spui tu, pe scurt? (opțional)'}
                     </label>
                     <input
                       type="text"
@@ -624,7 +778,7 @@ export default function NicheDiscover() {
                         setPhaseAData({ ...phaseAData, commonProblemsCustom: e.target.value })
                       }
                       className="w-full bg-dark-300 text-white rounded-lg p-3"
-                      placeholder="ex: nu știu cum să își organizeze mesele..."
+                      placeholder={language === 'en' ? 'ex: they do not know how to organize their meals...' : 'ex: nu știu cum să își organizeze mesele...'}
                     />
                   </div>
                 </div>
@@ -634,7 +788,9 @@ export default function NicheDiscover() {
               {stepA === 5 && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    A5. Dacă ai putea rezolva UN singur lucru pentru oameni în următoarele 2–3 luni, care ar fi?
+                    {language === 'en'
+                      ? 'A5. If you could solve ONE thing for people in the next 2-3 months, what would it be?'
+                      : 'A5. Dacă ai putea rezolva UN singur lucru pentru oameni în următoarele 2–3 luni, care ar fi?'}
                   </h2>
                   <div className="space-y-3">
                     {[
@@ -658,13 +814,13 @@ export default function NicheDiscover() {
                           }
                           className="w-5 h-5"
                         />
-                        <span className="text-white">{outcome}</span>
+                        <span className="text-white">{lt(outcome)}</span>
                       </label>
                     ))}
                   </div>
                   <div>
                     <label className="block text-gray-300 mb-2 text-sm">
-                      Ce ar însemna «rezolvat» pentru tine? (opțional)
+                      {language === 'en' ? 'What would “solved” mean to you? (optional)' : 'Ce ar însemna «rezolvat» pentru tine? (opțional)'}
                     </label>
                     <input
                       type="text"
@@ -673,7 +829,7 @@ export default function NicheDiscover() {
                         setPhaseAData({ ...phaseAData, primaryOutcomeDetail: e.target.value })
                       }
                       className="w-full bg-dark-300 text-white rounded-lg p-3"
-                      placeholder="ex: să nu mai sară peste mese..."
+                      placeholder={language === 'en' ? 'ex: they stop skipping meals...' : 'ex: să nu mai sară peste mese...'}
                     />
                   </div>
                 </div>
@@ -683,7 +839,9 @@ export default function NicheDiscover() {
               {stepA === 6 && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    A6. Ce tip de content NU vrei să faci, chiar dacă ar prinde?
+                    {language === 'en'
+                      ? 'A6. What kind of content do you NOT want to make, even if it performs?'
+                      : 'A6. Ce tip de content NU vrei să faci, chiar dacă ar prinde?'}
                   </h2>
                   <div className="space-y-3">
                     {[
@@ -703,13 +861,13 @@ export default function NicheDiscover() {
                           onChange={() => toggleArrayA('avoidContent', content)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white">{content}</span>
+                        <span className="text-white">{lt(content)}</span>
                       </label>
                     ))}
                   </div>
                   <div>
                     <label className="block text-gray-300 mb-2 text-sm">
-                      Alt lucru care nu te reprezintă? (opțional)
+                      {language === 'en' ? 'Anything else that does not represent you? (optional)' : 'Alt lucru care nu te reprezintă? (opțional)'}
                     </label>
                     <input
                       type="text"
@@ -718,7 +876,7 @@ export default function NicheDiscover() {
                         setPhaseAData({ ...phaseAData, avoidContentOther: e.target.value })
                       }
                       className="w-full bg-dark-300 text-white rounded-lg p-3"
-                      placeholder="ex: postări cu muzică puternică..."
+                      placeholder={language === 'en' ? 'ex: posts with loud music...' : 'ex: postări cu muzică puternică...'}
                     />
                   </div>
                 </div>
@@ -730,17 +888,16 @@ export default function NicheDiscover() {
           {phase === 'B' && (
             <div>
               <h2 className="text-2xl font-bold text-white mb-4">
-                Pe baza răspunsurilor tale, asta pare direcția cea mai potrivită pentru tine acum:
+                {lt('Pe baza răspunsurilor tale, asta pare direcția cea mai potrivită pentru tine acum:')}
               </h2>
               <p className="text-gray-300 mb-8">
-                Alege varianta care crezi că se potrivește cel mai bine pentru tine. Nu e o decizie
-                finală. Hai să o rafinăm rapid ca să pot crea content foarte precis.
+                {lt('Alege varianta care crezi că se potrivește cel mai bine pentru tine. Nu e o decizie finală. Hai să o rafinăm rapid ca să pot crea content foarte precis.')}
               </p>
 
               {variantsMutation.isPending && (
                 <div className="text-center py-12">
                   <div className="animate-spin w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full mx-auto mb-4" />
-                  <p className="text-gray-300">Generez cele 3 variante de nișă...</p>
+                  <p className="text-gray-300">{lt('Generez cele 3 variante de nișă...')}</p>
                 </div>
               )}
 
@@ -788,7 +945,7 @@ export default function NicheDiscover() {
               {stepC === 1 && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    C1. Cât de conștienți sunt de problema lor?
+                    {language === 'en' ? 'C1. How aware are they of their problem?' : 'C1. Cât de conștienți sunt de problema lor?'}
                   </h2>
                   <div className="space-y-3">
                     {[
@@ -811,7 +968,7 @@ export default function NicheDiscover() {
                           }
                           className="w-5 h-5"
                         />
-                        <span className="text-white">{option}</span>
+                        <span className="text-white">{lt(option)}</span>
                       </label>
                     ))}
                   </div>
@@ -822,7 +979,7 @@ export default function NicheDiscover() {
               {stepC === 2 && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    C2. Ce poveste își spun despre ei când vine vorba de fitness?
+                    {language === 'en' ? 'C2. What story do they tell themselves when it comes to fitness?' : 'C2. Ce poveste își spun despre ei când vine vorba de fitness?'}
                   </h2>
                   <div className="space-y-3">
                     {[
@@ -846,7 +1003,7 @@ export default function NicheDiscover() {
                           }
                           className="w-5 h-5"
                         />
-                        <span className="text-white">„{story}”</span>
+                        <span className="text-white">"{lt(story)}"</span>
                       </label>
                     ))}
                   </div>
@@ -857,7 +1014,7 @@ export default function NicheDiscover() {
               {stepC === 3 && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    C3. Care afirmație sună CEL MAI mult ca ei?
+                    {language === 'en' ? 'C3. Which statement sounds MOST like them?' : 'C3. Care afirmație sună CEL MAI mult ca ei?'}
                   </h2>
                   <div className="space-y-3">
                     {[
@@ -880,13 +1037,13 @@ export default function NicheDiscover() {
                           }
                           className="w-5 h-5"
                         />
-                        <span className="text-white">{statement}</span>
+                        <span className="text-white">{lt(statement)}</span>
                       </label>
                     ))}
                   </div>
                   <div>
                     <label className="block text-gray-300 mb-2 text-sm">
-                      Spune asta în cuvintele tale. (opțional)
+                      {language === 'en' ? 'Say it in your own words. (optional)' : 'Spune asta în cuvintele tale. (opțional)'}
                     </label>
                     <input
                       type="text"
@@ -895,7 +1052,7 @@ export default function NicheDiscover() {
                         setPhaseCData({ ...phaseCData, emotionalBlockCustom: e.target.value })
                       }
                       className="w-full bg-dark-300 text-white rounded-lg p-3"
-                      placeholder="ex: simt că nu mai am timp pentru mine..."
+                      placeholder={language === 'en' ? 'ex: I feel like I no longer have time for myself...' : 'ex: simt că nu mai am timp pentru mine...'}
                     />
                   </div>
                 </div>
@@ -905,7 +1062,7 @@ export default function NicheDiscover() {
               {stepC === 4 && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    C4. Te caută pentru: (poți alege mai multe)
+                    {language === 'en' ? 'C4. They usually come to you for: (you can choose more than one)' : 'C4. Te caută pentru: (poți alege mai multe)'}
                   </h2>
                   <div className="space-y-3">
                     {[
@@ -925,7 +1082,7 @@ export default function NicheDiscover() {
                           onChange={() => toggleArrayC('dominantGoals', goal)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white">{goal}</span>
+                        <span className="text-white">{lt(goal)}</span>
                       </label>
                     ))}
                   </div>
@@ -933,7 +1090,7 @@ export default function NicheDiscover() {
                   {phaseCData.dominantGoals.length > 1 && (
                     <div className="mt-6 pt-6 border-t border-dark-200">
                       <label className="block text-gray-300 mb-3 font-semibold">
-                        Dacă ar fi să alegi UNUL principal acum?
+                        {language === 'en' ? 'If you had to choose ONE main goal right now?' : 'Dacă ar fi să alegi UNUL principal acum?'}
                       </label>
                       <div className="space-y-2">
                         {phaseCData.dominantGoals.map((goal) => (
@@ -951,7 +1108,7 @@ export default function NicheDiscover() {
                               }
                               className="w-5 h-5"
                             />
-                            <span className="text-white text-sm">{goal}</span>
+                            <span className="text-white text-sm">{lt(goal)}</span>
                           </label>
                         ))}
                       </div>
@@ -964,11 +1121,13 @@ export default function NicheDiscover() {
               {stepC === 5 && (
                 <div className="space-y-8">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    Cum arată, în general, o zi obișnuită pentru clientul tău ideal:
+                    {language === 'en'
+                      ? 'What does a typical day usually look like for your ideal client?'
+                      : 'Cum arată, în general, o zi obișnuită pentru clientul tău ideal:'}
                   </h2>
 
                   <div>
-                    <label className="block text-gray-300 mb-2">Ora de trezire</label>
+                    <label className="block text-gray-300 mb-2">{language === 'en' ? 'Wake-up time' : 'Ora de trezire'}</label>
                     <input
                       type="text"
                       value={phaseCData.wakeUpTime}
@@ -976,12 +1135,12 @@ export default function NicheDiscover() {
                         setPhaseCData({ ...phaseCData, wakeUpTime: e.target.value })
                       }
                       className="w-full bg-dark-300 text-white rounded-lg p-3"
-                      placeholder="ex: 06:30"
+                      placeholder={language === 'en' ? 'ex: 06:30' : 'ex: 06:30'}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-gray-300 mb-3">Tip de job</label>
+                    <label className="block text-gray-300 mb-3">{language === 'en' ? 'Job type' : 'Tip de job'}</label>
                     <div className="space-y-2">
                       {[
                         { value: 'sedentar', label: 'Sedentar' },
@@ -1002,14 +1161,14 @@ export default function NicheDiscover() {
                             }
                             className="w-5 h-5"
                           />
-                          <span className="text-white">{option.label}</span>
+                          <span className="text-white">{lt(option.label)}</span>
                         </label>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-gray-300 mb-3">Timp petrecut jos</label>
+                    <label className="block text-gray-300 mb-3">{language === 'en' ? 'Time spent sitting' : 'Timp petrecut jos'}</label>
                     <div className="space-y-2">
                       {['<4h', '4-6h', '6-8h', '8h+'].map((time) => (
                         <label
@@ -1033,7 +1192,7 @@ export default function NicheDiscover() {
                   </div>
 
                   <div>
-                    <label className="block text-gray-300 mb-2">Dimineața:</label>
+                    <label className="block text-gray-300 mb-2">{language === 'en' ? 'Morning:' : 'Dimineața:'}</label>
                     <div className="space-y-2">
                       {['mănâncă acasă', 'cafea pe stomacul gol', 'snack rapid / patiserie'].map(
                         (option) => (
@@ -1047,7 +1206,7 @@ export default function NicheDiscover() {
                               onChange={() => toggleArrayC('morning', option)}
                               className="w-5 h-5"
                             />
-                            <span className="text-white text-sm">{option}</span>
+                            <span className="text-white text-sm">{lt(option)}</span>
                           </label>
                         )
                       )}
@@ -1055,7 +1214,7 @@ export default function NicheDiscover() {
                   </div>
 
                   <div>
-                    <label className="block text-gray-300 mb-2">Prânz:</label>
+                    <label className="block text-gray-300 mb-2">{language === 'en' ? 'Lunch:' : 'Prânz:'}</label>
                     <div className="space-y-2">
                       {['gătit', 'comandă', 'mănâncă pe fugă'].map((option) => (
                         <label
@@ -1068,14 +1227,14 @@ export default function NicheDiscover() {
                             onChange={() => toggleArrayC('lunch', option)}
                             className="w-5 h-5"
                           />
-                          <span className="text-white text-sm">{option}</span>
+                          <span className="text-white text-sm">{lt(option)}</span>
                         </label>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-gray-300 mb-2">Seara:</label>
+                    <label className="block text-gray-300 mb-2">{language === 'en' ? 'Evening:' : 'Seara:'}</label>
                     <div className="space-y-2">
                       {[
                         'prea obosiți pentru sală',
@@ -1092,7 +1251,7 @@ export default function NicheDiscover() {
                             onChange={() => toggleArrayC('evening', option)}
                             className="w-5 h-5"
                           />
-                          <span className="text-white text-sm">{option}</span>
+                          <span className="text-white text-sm">{lt(option)}</span>
                         </label>
                       ))}
                     </div>
@@ -1104,7 +1263,9 @@ export default function NicheDiscover() {
               {stepC === 6 && (
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    Există una sau mai multe situații care îi definesc clar?
+                    {language === 'en'
+                      ? 'Are there one or more situations that clearly define them?'
+                      : 'Există una sau mai multe situații care îi definesc clar?'}
                   </h2>
                   <div className="space-y-3">
                     {[
@@ -1125,7 +1286,7 @@ export default function NicheDiscover() {
                           onChange={() => toggleArrayC('definingSituations', situation)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white">{situation}</span>
+                        <span className="text-white">{lt(situation)}</span>
                       </label>
                     ))}
                   </div>
@@ -1136,14 +1297,14 @@ export default function NicheDiscover() {
               {stepC === 7 && (
                 <div className="space-y-8">
                   <h2 className="text-2xl font-bold text-white mb-6">
-                    Mai multe detalii despre situația lor
+                    {lt('Mai multe detalii despre situația lor')}
                   </h2>
 
                   {/* Kids Module */}
                   {showKidsModule && (
                     <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-6">
                       <h3 className="text-xl font-bold text-white mb-4">
-                        🧩 Cum le influențează copiii programul?
+                        {language === 'en' ? '🧩 How do children affect their schedule?' : '🧩 Cum le influențează copiii programul?'}
                       </h3>
                       <div className="space-y-2">
                         {[
@@ -1162,7 +1323,7 @@ export default function NicheDiscover() {
                               onChange={() => toggleArrayC('kidsImpact', impact)}
                               className="w-5 h-5"
                             />
-                            <span className="text-white text-sm">{impact}</span>
+                            <span className="text-white text-sm">{lt(impact)}</span>
                           </label>
                         ))}
                       </div>
@@ -1173,7 +1334,7 @@ export default function NicheDiscover() {
                   {showActiveModule && (
                     <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-6">
                       <h3 className="text-xl font-bold text-white mb-4">
-                        🧩 Cum se raportează la sport acum?
+                        {language === 'en' ? '🧩 What is their relationship with training right now?' : '🧩 Cum se raportează la sport acum?'}
                       </h3>
                       <div className="space-y-2">
                         {[
@@ -1192,7 +1353,7 @@ export default function NicheDiscover() {
                               onChange={() => toggleArrayC('activeStatus', status)}
                               className="w-5 h-5"
                             />
-                            <span className="text-white text-sm">{status}</span>
+                            <span className="text-white text-sm">{lt(status)}</span>
                           </label>
                         ))}
                       </div>
@@ -1203,7 +1364,7 @@ export default function NicheDiscover() {
                   {showPhysicalJobModule && (
                     <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-6">
                       <h3 className="text-xl font-bold text-white mb-4">
-                        🧩 Care e cea mai mare problemă pentru ei?
+                        {language === 'en' ? '🧩 What is the biggest problem for them?' : '🧩 Care e cea mai mare problemă pentru ei?'}
                       </h3>
                       <div className="space-y-2">
                         {[
@@ -1222,7 +1383,7 @@ export default function NicheDiscover() {
                               onChange={() => toggleArrayC('physicalJobIssue', issue)}
                               className="w-5 h-5"
                             />
-                            <span className="text-white text-sm">{issue}</span>
+                            <span className="text-white text-sm">{lt(issue)}</span>
                           </label>
                         ))}
                       </div>
@@ -1233,7 +1394,7 @@ export default function NicheDiscover() {
                   {showPainModule && (
                     <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6">
                       <h3 className="text-xl font-bold text-white mb-4">
-                        🧩 Unde apar cel mai des?
+                        {language === 'en' ? '🧩 Where do issues show up most often?' : '🧩 Unde apar cel mai des?'}
                       </h3>
                       <div className="space-y-2">
                         {['spate', 'genunchi', 'umeri', 'șolduri'].map((detail) => (
@@ -1247,7 +1408,7 @@ export default function NicheDiscover() {
                               onChange={() => toggleArrayC('painDetails', detail)}
                               className="w-5 h-5"
                             />
-                            <span className="text-white text-sm">{detail}</span>
+                            <span className="text-white text-sm">{lt(detail)}</span>
                           </label>
                         ))}
                       </div>
@@ -1257,7 +1418,9 @@ export default function NicheDiscover() {
                   {/* Lifestyle Specific */}
                   <div>
                     <label className="block text-gray-300 mb-2 text-sm">
-                      Mai e ceva specific la stilul lor de viață care contează? (opțional)
+                      {language === 'en'
+                        ? 'Is there anything else specific about their lifestyle that matters? (optional)'
+                        : 'Mai e ceva specific la stilul lor de viață care contează? (opțional)'}
                     </label>
                     <input
                       type="text"
@@ -1266,7 +1429,7 @@ export default function NicheDiscover() {
                         setPhaseCData({ ...phaseCData, lifestyleSpecific: e.target.value })
                       }
                       className="w-full bg-dark-300 text-white rounded-lg p-3"
-                      placeholder="ex: lucrează remote, călătoresc des..."
+                      placeholder={language === 'en' ? 'ex: they work remotely, travel often...' : 'ex: lucrează remote, călătoresc des...'}
                     />
                   </div>
 
@@ -1275,8 +1438,8 @@ export default function NicheDiscover() {
                     !showPhysicalJobModule &&
                     !showPainModule && (
                       <div className="text-center text-gray-400 py-8">
-                        <p>Nu ai selectat nicio situație specifică la pasul anterior.</p>
-                        <p className="text-sm mt-2">Poți continua mai departe.</p>
+                        <p>{lt('Nu ai selectat nicio situație specifică la pasul anterior.')}</p>
+                        <p className="text-sm mt-2">{lt('Poți continua mai departe.')}</p>
                       </div>
                     )}
                 </div>
@@ -1287,14 +1450,14 @@ export default function NicheDiscover() {
           {phase === 'D' && generatedResult && (
             <div className="space-y-4">
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-200">
-                Niche Builder generat și salvat automat în cont.
+                {lt('Niche Builder generat și salvat automat în cont.')}
               </div>
               <div className="rounded-lg border border-dark-200 bg-dark-300 p-5">
-                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">Nișa</h3>
+                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">{lt('Nișa')}</h3>
                 <p className="text-lg font-semibold text-white">{generatedResult.niche}</p>
               </div>
               <div className="rounded-lg border border-dark-200 bg-dark-300 p-5">
-                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">Client Ideal</h3>
+                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">{lt('Client Ideal')}</h3>
                 <div className="space-y-3">
                   {idealClientSections.map((section, index) => (
                     <div
@@ -1302,7 +1465,7 @@ export default function NicheDiscover() {
                       className="rounded-lg border border-dark-200 bg-dark-400/70 p-4"
                     >
                       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        {idealClientLabels[index] || `Punctul ${index + 1}`}
+                        {idealClientLabels[index] || `${lt('Punctul')} ${index + 1}`}
                       </p>
                       <p className="whitespace-pre-line text-white">{section}</p>
                     </div>
@@ -1310,7 +1473,7 @@ export default function NicheDiscover() {
                 </div>
               </div>
               <div className="rounded-lg border border-dark-200 bg-dark-300 p-5">
-                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">Poziționare</h3>
+                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">{lt('Poziționare')}</h3>
                 <div className="space-y-3">
                   {positioningSections.map((section, index) => (
                     <div
@@ -1318,7 +1481,7 @@ export default function NicheDiscover() {
                       className="rounded-lg border border-dark-200 bg-dark-400/70 p-4"
                     >
                       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        {positioningLabels[index] || `Punctul ${index + 1}`}
+                        {positioningLabels[index] || `${lt('Punctul')} ${index + 1}`}
                       </p>
                       <p className="whitespace-pre-line text-white">{section}</p>
                     </div>
@@ -1333,7 +1496,7 @@ export default function NicheDiscover() {
             {/* Back Button */}
             {phase === 'A' && stepA > 1 && (
               <Button variant="secondary" onClick={() => setStepA(stepA - 1)}>
-                Înapoi
+                {lt('Înapoi')}
               </Button>
             )}
             {phase === 'C' && stepC > 1 && (
@@ -1344,19 +1507,19 @@ export default function NicheDiscover() {
                   setStepC(stepC - 1);
                 }}
               >
-                Înapoi
+                {lt('Înapoi')}
               </Button>
             )}
             {phase === 'B' && (
               <Button variant="secondary" onClick={() => setPhase('A')}>
-                Înapoi la Faza A
+                {lt('Înapoi la Faza A')}
               </Button>
             )}
 
             {/* Next/Continue Button */}
             {phase === 'A' && stepA < 6 && (
               <Button variant="primary" onClick={() => setStepA(stepA + 1)} className="ml-auto">
-                Continuă
+                {lt('Continuă')}
               </Button>
             )}
             {phase === 'A' && stepA === 6 && (
@@ -1366,7 +1529,7 @@ export default function NicheDiscover() {
                 disabled={variantsMutation.isPending}
                 className="ml-auto"
               >
-                {variantsMutation.isPending ? 'Generez variante...' : 'Generează Variante →'}
+                {variantsMutation.isPending ? lt('Generez variante...') : lt('Generează Variante →')}
               </Button>
             )}
             {phase === 'B' && (
@@ -1376,12 +1539,12 @@ export default function NicheDiscover() {
                 disabled={selectedVariant === null}
                 className="ml-auto"
               >
-                Continuă cu Această Variantă →
+                {lt('Continuă cu Această Variantă →')}
               </Button>
             )}
             {phase === 'C' && stepC < 7 && (
               <Button variant="primary" onClick={handlePhaseCNext} className="ml-auto">
-                Continuă
+                {lt('Continuă')}
               </Button>
             )}
           {phase === 'C' && stepC === 7 && (
@@ -1391,12 +1554,12 @@ export default function NicheDiscover() {
               disabled={generateMutation.isPending}
               className="ml-auto"
             >
-              {generateMutation.isPending ? 'Generez Niche Builder Final...' : 'Generează Niche Builder →'}
+              {generateMutation.isPending ? lt('Generez Niche Builder Final...') : lt('Generează Niche Builder →')}
             </Button>
           )}
           {phase === 'D' && (
             <Button variant="secondary" onClick={() => setPhase('A')}>
-              Reia Quizul
+              {lt('Reia Quizul')}
             </Button>
           )}
         </div>
@@ -1404,14 +1567,14 @@ export default function NicheDiscover() {
           {/* Error Messages */}
           {variantsMutation.isError && (
             <p className="text-red-500 mt-4">
-              Eroare la generare variante:{' '}
-              {(variantsMutation.error as any)?.response?.data?.error || 'Ceva nu a mers bine'}
+              {lt('Eroare la generare variante:')}{' '}
+              {(variantsMutation.error as any)?.response?.data?.error || lt('Ceva nu a mers bine')}
             </p>
           )}
           {generateMutation.isError && (
             <p className="text-red-500 mt-4">
-              Eroare:{' '}
-              {(generateMutation.error as any)?.response?.data?.error || 'Ceva nu a mers bine'}
+              {lt('Eroare:')}{' '}
+              {(generateMutation.error as any)?.response?.data?.error || lt('Ceva nu a mers bine')}
             </p>
           )}
         </Card>

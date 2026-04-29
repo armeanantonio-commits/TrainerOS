@@ -2,20 +2,24 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import { buildApiUrl } from '@/services/api';
+import { useI18n } from '@/hooks/useI18n';
 
 type Message = {
   role: 'user' | 'assistant';
   content: string;
 };
 
-const STREAM_ERROR_MARKER = '[TrainerOS] A intervenit o eroare de streaming. Încearcă din nou.';
+const STREAM_ERROR_MARKERS = [
+  '[TrainerOS] A intervenit o eroare de streaming. Încearcă din nou.',
+  '[TrainerOS] A streaming error occurred. Try again.',
+];
 
 export default function Chat() {
+  const { language, t } = useI18n();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content:
-        'Sunt TrainerOS. Te ajut strict cu marketing fitness: ofertă, poziționare, mesaje de vânzare, funnel, lead generation și optimizare de conversie.',
+      content: t('chat.starter'),
     },
   ]);
   const [input, setInput] = useState('');
@@ -25,6 +29,15 @@ export default function Chat() {
   const abortRef = useRef<AbortController | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
+
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length !== 1 || prev[0].role !== 'assistant') {
+        return prev;
+      }
+      return [{ role: 'assistant', content: t('chat.starter') }];
+    });
+  }, [language]);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -58,7 +71,7 @@ export default function Chat() {
 
     const token = localStorage.getItem('token');
     if (!token) {
-      setError('Nu ești autentificat. Te rugăm să te loghezi din nou.');
+      setError(t('chat.authError'));
       return;
     }
 
@@ -92,7 +105,7 @@ export default function Chat() {
 
       if (!response.ok || !response.body) {
         const text = await response.text();
-        let errorMessage = 'Nu am putut porni conversația.';
+        let errorMessage = t('chat.startError');
 
         if (text) {
           try {
@@ -120,11 +133,16 @@ export default function Chat() {
           if (chunkText) {
             assistantContent += chunkText;
 
-            const errorMarkerIndex = assistantContent.indexOf(STREAM_ERROR_MARKER);
+            const errorMarkers = [t('chat.streamMarker'), ...STREAM_ERROR_MARKERS];
+            const errorMarkerIndex = errorMarkers.reduce((foundIndex, marker) => {
+              const markerIndex = assistantContent.indexOf(marker);
+              if (markerIndex === -1) return foundIndex;
+              return foundIndex === -1 ? markerIndex : Math.min(foundIndex, markerIndex);
+            }, -1);
             if (errorMarkerIndex !== -1) {
               const safeContent = assistantContent.slice(0, errorMarkerIndex).trimEnd();
               updateLastAssistantMessage(safeContent);
-              throw new Error('Conexiunea de streaming s-a întrerupt. Încearcă din nou.');
+              throw new Error(t('chat.streamInterrupted'));
             }
 
             updateLastAssistantMessage(assistantContent);
@@ -133,7 +151,7 @@ export default function Chat() {
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        setError(err.message || 'A apărut o eroare la streaming.');
+        setError(err.message || t('chat.streamError'));
       }
     } finally {
       abortRef.current = null;
@@ -194,7 +212,7 @@ export default function Chat() {
                 }}
                 className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs text-cyan-100 hover:bg-cyan-300/20"
               >
-                Vezi mesajul curent
+                {t('chat.viewCurrent')}
               </button>
             </div>
           )}
@@ -210,7 +228,7 @@ export default function Chat() {
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Scrie mesajul tău pentru TrainerOS..."
+                placeholder={t('chat.placeholder')}
                 className="min-h-[88px] w-full resize-none bg-transparent text-white placeholder:text-slate-500 focus:outline-none sm:min-h-[92px]"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -223,16 +241,16 @@ export default function Chat() {
 
               <div className="mt-3 flex items-center justify-between gap-3">
                 <p className="text-xs text-slate-400">
-                  Enter trimite mesajul • Shift+Enter linie nouă
+                  {t('chat.keyboardHint')}
                 </p>
                 <div className="flex items-center gap-2">
                   {isStreaming && (
                     <Button variant="outline" onClick={stopStreaming}>
-                      Stop
+                      {t('chat.stop')}
                     </Button>
                   )}
                   <Button onClick={() => void sendMessage(input)} disabled={!canSend}>
-                    Trimite
+                    {t('chat.send')}
                   </Button>
                 </div>
               </div>

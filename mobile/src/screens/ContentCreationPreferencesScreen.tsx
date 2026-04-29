@@ -14,6 +14,7 @@ import Card from '../components/Card';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { contentAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 interface ContentCreationData {
   filmingLocation: string;
@@ -48,6 +49,7 @@ const DEFAULT_FORM: ContentCreationData = {
 export default function ContentCreationPreferencesScreen() {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<ContentCreationData>(DEFAULT_FORM);
 
@@ -85,14 +87,14 @@ export default function ContentCreationPreferencesScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       await queryClient.invalidateQueries({ queryKey: ['content-preferences'] });
-      Alert.alert('Succes', 'Preferințele au fost salvate.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+      Alert.alert(t('prefs.success'), t('creation.saved'), [
+        { text: t('prefs.ok'), onPress: () => navigation.goBack() },
       ]);
     },
     onError: (error: any) => {
       Alert.alert(
-        'Eroare',
-        error?.response?.data?.error || 'Nu am putut salva preferințele.'
+        t('daily.error'),
+        error?.response?.data?.error || t('creation.saveError')
       );
     },
   });
@@ -114,7 +116,7 @@ export default function ContentCreationPreferencesScreen() {
 
   const handleContinue = () => {
     if (!canGoNext()) {
-      Alert.alert('Validare', 'Completează întrebarea curentă.');
+      Alert.alert(t('prefs.validation'), t('prefs.required'));
       return;
     }
     setStep((prev) => Math.min(totalSteps, prev + 1));
@@ -124,30 +126,34 @@ export default function ContentCreationPreferencesScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.stepText}>
-          Întrebare {step} din {totalSteps}
+          {t('prefs.questionProgress', { current: step, total: totalSteps })}
         </Text>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${(step / totalSteps) * 100}%` }]} />
         </View>
-        <Text style={styles.title}>Cum vrei să creezi content?</Text>
+        <Text style={styles.title}>{t('creation.title')}</Text>
       </View>
 
       <Card>
         {step === 1 ? (
           <View>
             <Text style={styles.questionTitle}>
-              1) Unde îți este cel mai ușor să filmezi content?
+              {t('creation.q1Mobile')}
             </Text>
-            {filmingLocationOptions.map((option) => (
+            {[
+              { value: filmingLocationOptions[0], label: t('creation.location.home') },
+              { value: filmingLocationOptions[1], label: t('creation.location.gym') },
+              { value: filmingLocationOptions[2], label: t('creation.location.both') },
+            ].map((option) => (
               <TouchableOpacity
-                key={option}
+                key={option.value}
                 style={[
                   styles.option,
-                  formData.filmingLocation === option && styles.optionActive,
+                  formData.filmingLocation === option.value && styles.optionActive,
                 ]}
-                onPress={() => setFormData({ ...formData, filmingLocation: option })}
+                onPress={() => setFormData({ ...formData, filmingLocation: option.value })}
               >
-                <Text style={styles.optionText}>{option}</Text>
+                <Text style={styles.optionText}>{option.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -156,28 +162,33 @@ export default function ContentCreationPreferencesScreen() {
         {step === 2 ? (
           <View>
             <Text style={styles.questionTitle}>
-              2) Ce tip de content îți vine cel mai natural?
+              {t('creation.q2Mobile')}
             </Text>
-            {naturalContentTypeOptions.map((option) => (
+            {[
+              { value: naturalContentTypeOptions[0], label: t('creation.type.nutrition') },
+              { value: naturalContentTypeOptions[1], label: t('creation.type.training') },
+              { value: naturalContentTypeOptions[2], label: t('creation.type.relatable') },
+              { value: naturalContentTypeOptions[3], label: t('creation.type.story') },
+            ].map((option) => (
               <TouchableOpacity
-                key={option}
+                key={option.value}
                 style={[
                   styles.option,
-                  formData.naturalContentTypes.includes(option) && styles.optionActive,
+                  formData.naturalContentTypes.includes(option.value) && styles.optionActive,
                 ]}
-                onPress={() => toggleMulti('naturalContentTypes', option)}
+                onPress={() => toggleMulti('naturalContentTypes', option.value)}
               >
-                <Text style={styles.optionText}>{option}</Text>
+                <Text style={styles.optionText}>{option.label}</Text>
               </TouchableOpacity>
             ))}
 
             <Input
-              label="Alt format (opțional)"
+              label={t('creation.otherFormatMobile')}
               value={formData.otherNaturalFormat}
               onChangeText={(value) =>
                 setFormData({ ...formData, otherNaturalFormat: value })
               }
-              placeholder="Scrie aici"
+              placeholder={t('creation.otherPlaceholderMobile')}
             />
           </View>
         ) : null}
@@ -185,18 +196,23 @@ export default function ContentCreationPreferencesScreen() {
         {step === 3 ? (
           <View>
             <Text style={styles.questionTitle}>
-              3) Ce stil de livrare ți se potrivește mai mult?
+              {t('creation.q3Mobile')}
             </Text>
-            {deliveryStyleOptions.map((option) => (
+            {[
+              { value: deliveryStyleOptions[0], label: t('creation.delivery.camera') },
+              { value: deliveryStyleOptions[1], label: t('creation.delivery.voiceover') },
+              { value: deliveryStyleOptions[2], label: t('creation.delivery.broll') },
+              { value: deliveryStyleOptions[3], label: t('creation.delivery.mix') },
+            ].map((option) => (
               <TouchableOpacity
-                key={option}
+                key={option.value}
                 style={[
                   styles.option,
-                  formData.deliveryStyles.includes(option) && styles.optionActive,
+                  formData.deliveryStyles.includes(option.value) && styles.optionActive,
                 ]}
-                onPress={() => toggleMulti('deliveryStyles', option)}
+                onPress={() => toggleMulti('deliveryStyles', option.value)}
               >
-                <Text style={styles.optionText}>{option}</Text>
+                <Text style={styles.optionText}>{option.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -204,17 +220,17 @@ export default function ContentCreationPreferencesScreen() {
 
         <View style={styles.actionsRow}>
           <Button
-            title="Înapoi"
+            title={t('prefs.back')}
             variant="outline"
             disabled={step === 1}
             onPress={() => setStep((prev) => Math.max(1, prev - 1))}
           />
 
           {step < totalSteps ? (
-            <Button title="Următorul" onPress={handleContinue} disabled={!canGoNext()} />
+            <Button title={t('prefs.next')} onPress={handleContinue} disabled={!canGoNext()} />
           ) : (
             <Button
-              title="Salvează"
+              title={t('creation.save')}
               onPress={() => saveMutation.mutate(formData)}
               loading={saveMutation.isPending}
               disabled={!canGoNext()}

@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { colors } from '../constants/colors';
 import Card from '../components/Card';
 import { feedbackAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 interface FeedbackItem {
   id: string;
@@ -25,6 +26,7 @@ interface FeedbackItem {
 
 export default function FeedbackHistoryScreen() {
   const navigation = useNavigation<any>();
+  const { language, t } = useI18n();
 
   const { data, isLoading } = useQuery({
     queryKey: ['feedback-history'],
@@ -62,11 +64,11 @@ export default function FeedbackHistoryScreen() {
               </View>
 
               <Text style={styles.dateText}>
-                {new Date(item.createdAt).toLocaleDateString('ro-RO')}
+                {new Date(item.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'ro-RO')}
               </Text>
 
               <View style={styles.metricsRow}>
-                <Text style={styles.metricText}>Claritate: {item.clarityScore}</Text>
+                <Text style={styles.metricText}>{t('review.clarity')}: {item.clarityScore}</Text>
                 <Text style={styles.metricText}>CTA: {item.ctaScore}</Text>
               </View>
             </Card>
@@ -74,8 +76,8 @@ export default function FeedbackHistoryScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>Niciun review încă</Text>
-            <Text style={styles.emptyText}>Mergi în Content Review și analizează primul content.</Text>
+            <Text style={styles.emptyTitle}>{t('feedbackHistory.emptyTitle')}</Text>
+            <Text style={styles.emptyText}>{t('feedbackHistory.emptyText')}</Text>
           </View>
         }
       />

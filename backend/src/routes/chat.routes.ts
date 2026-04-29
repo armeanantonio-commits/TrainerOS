@@ -12,6 +12,7 @@ import {
   buildAntiRepeatPromptSection,
   generateUniqueResult,
 } from '../lib/generation-history.js';
+import { buildAiLanguageInstruction, normalizeLanguage } from '../lib/language.js';
 
 const router = Router();
 const prismaAny = prisma as any;
@@ -86,6 +87,7 @@ router.post('/stream', authenticate, async (req, res) => {
           contentPreferences: true,
         },
       });
+      const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(req.user.preferredLanguage));
 
       const safeHistory = (Array.isArray(history) ? history : [])
         .filter((item) => item && (item.role === 'user' || item.role === 'assistant'))
@@ -133,6 +135,7 @@ router.post('/stream', authenticate, async (req, res) => {
             'If the user asks about unrelated topics, politely refuse and redirect to fitness marketing/content topics.',
             'Use the global context provided below in every answer.',
             'Keep answers actionable, concise, and structured for execution.',
+            languageInstruction,
             '',
             globalContext,
             antiRepeatSection ? `\n${antiRepeatSection}` : '',

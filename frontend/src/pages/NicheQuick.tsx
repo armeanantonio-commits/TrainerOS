@@ -4,6 +4,7 @@ import { nicheAPI } from '@/services/api';
 import Button from '@/components/Button';
 import Card from '@/components/Card';
 import { useAuth } from '@/contexts/AuthContext';
+import { useI18n } from '@/hooks/useI18n';
 
 interface FormData {
   // Q1: Gender
@@ -60,9 +61,83 @@ function getResultValue(value: string | undefined, fallback: string): string {
   return normalized && normalized.length > 0 ? normalized : fallback;
 }
 
+const optionTranslations: Record<string, string> = {
+  'Bărbați': 'Men',
+  'Femei': 'Women',
+  'Ambele': 'Both',
+  'Sedentar': 'Sedentary',
+  'Activ': 'Active',
+  'Mixt': 'Mixed',
+  'mănâncă acasă': 'eat at home',
+  'cafea pe stomacul gol': 'coffee on an empty stomach',
+  'snack rapid / patiserie': 'quick snack / pastry',
+  'gătit': 'home-cooked',
+  'comandă': 'order in',
+  'mănâncă pe fugă': 'eat on the go',
+  'prea obosiți pentru sală': 'too tired for the gym',
+  'au timp, dar fără energie': 'they have time, but no energy',
+  'se antrenează rar': 'they train rarely',
+  'Au copii': 'They have children',
+  'Sunt deja activi / merg la sală': 'They are already active / go to the gym',
+  'Au un job foarte solicitant fizic': 'They have a physically demanding job',
+  'Lucrează în ture / program neregulat': 'They work shifts / irregular schedule',
+  'Au dureri / limitări fizice': 'They have pain / physical limitations',
+  'Niciuna dintre cele de mai sus': 'None of the above',
+  'se trezesc foarte devreme': 'they wake up very early',
+  'mesele sunt haotice': 'meals are chaotic',
+  'timpul pentru ei e seara târziu': 'their time is late in the evening',
+  'oboseala e principalul obstacol': 'fatigue is the main obstacle',
+  'merg constant, dar fără rezultate': 'they go consistently, but without results',
+  'merg haotic': 'they go inconsistently',
+  'știu exercițiile, dar nu structura': 'they know the exercises, but not the structure',
+  'se plafonează ușor': 'they plateau easily',
+  'oboseală cronică': 'chronic fatigue',
+  'dureri': 'pain',
+  'program imprevizibil': 'unpredictable schedule',
+  'alimentație dezorganizată': 'disorganized eating',
+  'spate': 'back',
+  'genunchi': 'knees',
+  'umeri': 'shoulders',
+  'șolduri': 'hips',
+  'istoric de accidentare': 'injury history',
+  'se tem să nu agraveze': 'they are afraid of making it worse',
+  'Slăbit': 'Weight loss',
+  'Tonifiere / estetic': 'Toning / aesthetics',
+  'Energie / stare generală': 'Energy / overall wellbeing',
+  'Disciplină / consecvență': 'Discipline / consistency',
+  'Dureri / disconfort': 'Pain / discomfort',
+  'Încep bine și se opresc': 'They start well and then stop',
+  'Nu au energie după muncă': 'They have no energy after work',
+  'Mănâncă ok câteva zile, apoi scapă controlul': 'They eat well for a few days, then lose control',
+  'Nu văd rezultate și se demotivează': 'They do not see results and lose motivation',
+  '„Știu ce ar trebui să fac, dar nu mă țin"': '"I know what I should do, but I do not stick to it"',
+  '„Simt că m-am lăsat"': '"I feel like I have let myself go"',
+  '„Am mai încercat și m-am oprit"': '"I have tried before and stopped"',
+  '„Nu mai am energie pentru mine"': '"I have no energy left for myself"',
+  'Diete extreme': 'Extreme diets',
+  'Antrenamente prea complicate': 'Overly complicated workouts',
+  'Fitness fake / promisiuni exagerate': 'Fake fitness / exaggerated promises',
+  'Limbaj prea tehnic': 'Overly technical language',
+  'Începători': 'Beginners',
+  'Intermitenți': 'Inconsistent',
+  'Activi, dar fără rezultate': 'Active, but without results',
+  'Au mai făcut sport, dar s-au lăsat': 'They used to work out, but stopped',
+  'Înțeleși': 'Understood',
+  'Motivați': 'Motivated',
+  'Liniștiți': 'Reassured',
+  'Provocați': 'Challenged',
+  '„Pot și eu"': '"I can do it too"',
+  'Frica de eșec': 'Fear of failure',
+  'Frica de judecată': 'Fear of judgment',
+  'Au mai încercat și au eșuat': 'They have tried before and failed',
+  'Se simt copleșiți': 'They feel overwhelmed',
+  'Nu cred că pot': 'They do not believe they can',
+};
+
 export default function NicheQuick() {
   const queryClient = useQueryClient();
   const { refreshUser } = useAuth();
+  const { language } = useI18n();
   const [step, setStep] = useState(1);
   const totalSteps = 12;
   
@@ -118,6 +193,51 @@ export default function NicheQuick() {
 
   const generatedResult = generateMutation.data?.data as GeneratedNicheResult | undefined;
 
+  const ui = language === 'en'
+    ? {
+        title: 'Tell Me Your Niche',
+        subtitle: 'Describe your ideal client. AI will create the full Niche Builder.',
+        stepProgress: 'Step',
+        of: 'of',
+        requiredAlert: 'Please complete the required fields.',
+        back: 'Back',
+        continue: 'Continue',
+        generating: 'Generating Niche Builder...',
+        submit: 'Generate Niche Builder →',
+        saved: 'Niche Builder saved automatically to your account.',
+        niche: 'Niche',
+        nicheFallback: 'The niche was not generated completely.',
+        idealClient: 'Ideal Client',
+        idealClientFallback: 'The ideal client was not returned completely. Try generating again for the full profile.',
+        positioning: 'Positioning',
+        positioningFallback: 'The positioning message was not returned completely. Try again.',
+        errorPrefix: 'Error:',
+        genericError: 'Something went wrong',
+      }
+    : {
+        title: 'Spune-mi Nișa Ta',
+        subtitle: 'Descrie clientul tău ideal — AI-ul va crea Niche Builder-ul complet',
+        stepProgress: 'Pas',
+        of: 'din',
+        requiredAlert: 'Te rog completează câmpurile obligatorii',
+        back: 'Înapoi',
+        continue: 'Continuă',
+        generating: 'Generez Niche Builder...',
+        submit: 'Generează Niche Builder →',
+        saved: 'Niche Builder salvat automat în cont.',
+        niche: 'Nișa',
+        nicheFallback: 'Nișa nu a fost generată complet.',
+        idealClient: 'Client Ideal',
+        idealClientFallback: 'Clientul ideal nu a fost returnat complet. Reîncearcă generarea pentru profilul complet.',
+        positioning: 'Poziționare',
+        positioningFallback: 'Mesajul de poziționare nu a fost returnat complet. Reîncearcă generarea.',
+        errorPrefix: 'Eroare:',
+        genericError: 'Ceva nu a mers bine',
+      };
+
+  const translateOption = (value: string) =>
+    language === 'en' ? optionTranslations[value] || value : value;
+
   const toggleArray = (field: keyof FormData, value: string) => {
     const current = formData[field] as string[];
     if (current.includes(value)) {
@@ -129,7 +249,7 @@ export default function NicheQuick() {
 
   const handleSubmit = () => {
     if (!formData.gender || formData.ageRanges.length === 0 || !formData.differentiation.trim()) {
-      alert('Te rog completează câmpurile obligatorii');
+      alert(ui.requiredAlert);
       return;
     }
     generateMutation.mutate(formData);
@@ -151,10 +271,10 @@ export default function NicheQuick() {
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-4 font-display">
-            Spune-mi Nișa Ta
+            {ui.title}
           </h1>
           <p className="text-gray-300">
-            Descrie clientul tău ideal — AI-ul va crea Niche Builder-ul complet
+            {ui.subtitle}
           </p>
         </div>
 
@@ -166,7 +286,9 @@ export default function NicheQuick() {
               style={{ width: `${(step / totalSteps) * 100}%` }}
             />
           </div>
-          <p className="text-center text-gray-500 mt-2 text-sm">Pas {step} din {totalSteps}</p>
+          <p className="text-center text-gray-500 mt-2 text-sm">
+            {ui.stepProgress} {step} {ui.of} {totalSteps}
+          </p>
         </div>
 
         <Card>
@@ -174,13 +296,13 @@ export default function NicheQuick() {
           {step === 1 && (
             <div>
               <h2 className="text-2xl font-bold text-white mb-6">
-                1⃣ Cu ce tip de persoane vrei să lucrezi?
+                {language === 'en' ? '1⃣ What type of people do you want to work with?' : '1⃣ Cu ce tip de persoane vrei să lucrezi?'}
               </h2>
               <div className="space-y-3">
                 {[
-                  { value: 'barbati', label: 'Bărbați' },
-                  { value: 'femei', label: 'Femei' },
-                  { value: 'ambele', label: 'Ambele' },
+                  { value: 'barbati', label: translateOption('Bărbați') },
+                  { value: 'femei', label: translateOption('Femei') },
+                  { value: 'ambele', label: translateOption('Ambele') },
                 ].map((option) => (
                   <label
                     key={option.value}
@@ -206,7 +328,9 @@ export default function NicheQuick() {
           {/* Step 2: Age */}
           {step === 2 && (
             <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6">2⃣ Ce vârstă au, în general?</h2>
+              <h2 className="text-2xl font-bold text-white mb-6">
+                {language === 'en' ? '2⃣ What age are they, in general?' : '2⃣ Ce vârstă au, în general?'}
+              </h2>
               <div className="space-y-3">
                 {['18–25', '25–35', '35–45', '45+'].map((age) => (
                   <label
@@ -225,7 +349,7 @@ export default function NicheQuick() {
               </div>
               <div>
                 <label className="block text-gray-300 mb-2 text-sm">
-                  Spune-mi alt interval de vârstă (opțional)
+                  {language === 'en' ? 'Tell me another age range (optional)' : 'Spune-mi alt interval de vârstă (opțional)'}
                 </label>
                 <input
                   type="text"
@@ -242,11 +366,13 @@ export default function NicheQuick() {
           {step === 3 && (
             <div className="space-y-8">
               <h2 className="text-2xl font-bold text-white mb-6">
-                Cum arată, în general, o zi obișnuită pentru clientul tău ideal:
+                {language === 'en'
+                  ? 'What does a typical day usually look like for your ideal client?'
+                  : 'Cum arată, în general, o zi obișnuită pentru clientul tău ideal:'}
               </h2>
 
               <div>
-                <label className="block text-gray-300 mb-2">Ora de trezire</label>
+                <label className="block text-gray-300 mb-2">{language === 'en' ? 'Wake-up time' : 'Ora de trezire'}</label>
                 <input
                   type="text"
                   value={formData.wakeUpTime}
@@ -257,12 +383,12 @@ export default function NicheQuick() {
               </div>
 
               <div>
-                <label className="block text-gray-300 mb-3">Tip de job</label>
+                <label className="block text-gray-300 mb-3">{language === 'en' ? 'Type of job' : 'Tip de job'}</label>
                 <div className="space-y-2">
                   {[
-                    { value: 'sedentar', label: 'Sedentar' },
-                    { value: 'activ', label: 'Activ' },
-                    { value: 'mixt', label: 'Mixt' },
+                    { value: 'sedentar', label: translateOption('Sedentar') },
+                    { value: 'activ', label: translateOption('Activ') },
+                    { value: 'mixt', label: translateOption('Mixt') },
                   ].map((option) => (
                     <label
                       key={option.value}
@@ -285,7 +411,7 @@ export default function NicheQuick() {
               </div>
 
               <div>
-                <label className="block text-gray-300 mb-3">Timp petrecut jos</label>
+                <label className="block text-gray-300 mb-3">{language === 'en' ? 'Time spent sitting' : 'Timp petrecut jos'}</label>
                 <div className="space-y-2">
                   {['<4h', '4-6h', '6-8h', '8h+'].map((time) => (
                     <label
@@ -309,7 +435,7 @@ export default function NicheQuick() {
               </div>
 
               <div>
-                <label className="block text-gray-300 mb-2">Dimineața:</label>
+                <label className="block text-gray-300 mb-2">{language === 'en' ? 'Morning:' : 'Dimineața:'}</label>
                 <div className="space-y-2">
                   {['mănâncă acasă', 'cafea pe stomacul gol', 'snack rapid / patiserie'].map(
                     (option) => (
@@ -323,7 +449,7 @@ export default function NicheQuick() {
                           onChange={() => toggleArray('morning', option)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white text-sm">{option}</span>
+                        <span className="text-white text-sm">{translateOption(option)}</span>
                       </label>
                     )
                   )}
@@ -331,7 +457,7 @@ export default function NicheQuick() {
               </div>
 
               <div>
-                <label className="block text-gray-300 mb-2">Prânz:</label>
+                <label className="block text-gray-300 mb-2">{language === 'en' ? 'Lunch:' : 'Prânz:'}</label>
                 <div className="space-y-2">
                   {['gătit', 'comandă', 'mănâncă pe fugă'].map((option) => (
                     <label
@@ -344,14 +470,14 @@ export default function NicheQuick() {
                         onChange={() => toggleArray('lunch', option)}
                         className="w-5 h-5"
                       />
-                      <span className="text-white text-sm">{option}</span>
+                      <span className="text-white text-sm">{translateOption(option)}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="block text-gray-300 mb-2">Seara:</label>
+                <label className="block text-gray-300 mb-2">{language === 'en' ? 'Evening:' : 'Seara:'}</label>
                 <div className="space-y-2">
                   {[
                     'prea obosiți pentru sală',
@@ -368,7 +494,7 @@ export default function NicheQuick() {
                         onChange={() => toggleArray('evening', option)}
                         className="w-5 h-5"
                       />
-                      <span className="text-white text-sm">{option}</span>
+                      <span className="text-white text-sm">{translateOption(option)}</span>
                     </label>
                   ))}
                 </div>
@@ -380,7 +506,9 @@ export default function NicheQuick() {
           {step === 4 && (
             <div>
               <h2 className="text-2xl font-bold text-white mb-6">
-                Există una sau mai multe situații care îi definesc clar?
+                {language === 'en'
+                  ? 'Are there one or more situations that clearly define them?'
+                  : 'Există una sau mai multe situații care îi definesc clar?'}
               </h2>
               <div className="space-y-3">
                 {[
@@ -401,7 +529,7 @@ export default function NicheQuick() {
                       onChange={() => toggleArray('definingSituations', situation)}
                       className="w-5 h-5"
                     />
-                    <span className="text-white">{situation}</span>
+                    <span className="text-white">{translateOption(situation)}</span>
                   </label>
                 ))}
               </div>
@@ -412,14 +540,14 @@ export default function NicheQuick() {
           {step === 5 && (
             <div className="space-y-8">
               <h2 className="text-2xl font-bold text-white mb-6">
-                Mai multe detalii despre situația lor
+                {language === 'en' ? 'More details about their situation' : 'Mai multe detalii despre situația lor'}
               </h2>
 
               {/* Conditional Module: Kids */}
               {showKidsModule && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-6">
                   <h3 className="text-xl font-bold text-white mb-4">
-                    🧩 Cum le influențează copiii programul?
+                    🧩 {language === 'en' ? 'How do children affect their schedule?' : 'Cum le influențează copiii programul?'}
                   </h3>
                   <div className="space-y-2">
                     {[
@@ -438,7 +566,7 @@ export default function NicheQuick() {
                           onChange={() => toggleArray('kidsImpact', impact)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white text-sm">{impact}</span>
+                        <span className="text-white text-sm">{translateOption(impact)}</span>
                       </label>
                     ))}
                   </div>
@@ -449,7 +577,7 @@ export default function NicheQuick() {
               {showActiveModule && (
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-6">
                   <h3 className="text-xl font-bold text-white mb-4">
-                    🧩 Cum se raportează la sport acum?
+                    🧩 {language === 'en' ? 'How do they relate to fitness right now?' : 'Cum se raportează la sport acum?'}
                   </h3>
                   <div className="space-y-2">
                     {[
@@ -468,7 +596,7 @@ export default function NicheQuick() {
                           onChange={() => toggleArray('activeStatus', status)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white text-sm">{status}</span>
+                        <span className="text-white text-sm">{translateOption(status)}</span>
                       </label>
                     ))}
                   </div>
@@ -479,7 +607,7 @@ export default function NicheQuick() {
               {showPhysicalJobModule && (
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-6">
                   <h3 className="text-xl font-bold text-white mb-4">
-                    🧩 Care e cea mai mare problemă pentru ei?
+                    🧩 {language === 'en' ? 'What is the biggest problem for them?' : 'Care e cea mai mare problemă pentru ei?'}
                   </h3>
                   <div className="space-y-2">
                     {[
@@ -498,7 +626,7 @@ export default function NicheQuick() {
                           onChange={() => toggleArray('physicalJobIssue', issue)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white text-sm">{issue}</span>
+                        <span className="text-white text-sm">{translateOption(issue)}</span>
                       </label>
                     ))}
                   </div>
@@ -509,7 +637,7 @@ export default function NicheQuick() {
               {showPainModule && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6">
                   <h3 className="text-xl font-bold text-white mb-4">
-                    🧩 Unde apar cel mai des?
+                    🧩 {language === 'en' ? 'Where do issues show up most often?' : 'Unde apar cel mai des?'}
                   </h3>
                   <div className="space-y-2">
                     {[
@@ -530,7 +658,7 @@ export default function NicheQuick() {
                           onChange={() => toggleArray('painDetails', detail)}
                           className="w-5 h-5"
                         />
-                        <span className="text-white text-sm">{detail}</span>
+                        <span className="text-white text-sm">{translateOption(detail)}</span>
                       </label>
                     ))}
                   </div>
@@ -540,21 +668,23 @@ export default function NicheQuick() {
               {/* Lifestyle Specific */}
               <div>
                 <label className="block text-gray-300 mb-2 text-sm">
-                  Mai e ceva specific la stilul lor de viață care contează? (opțional)
+                  {language === 'en'
+                    ? 'Is there anything specific about their lifestyle that matters? (optional)'
+                    : 'Mai e ceva specific la stilul lor de viață care contează? (opțional)'}
                 </label>
                 <input
                   type="text"
                   value={formData.lifestyleSpecific}
                   onChange={(e) => setFormData({ ...formData, lifestyleSpecific: e.target.value })}
                   className="w-full bg-dark-300 text-white rounded-lg p-3"
-                  placeholder="ex: lucrează remote, călătoresc des..."
+                  placeholder={language === 'en' ? 'ex: they work remotely, travel often...' : 'ex: lucrează remote, călătoresc des...'}
                 />
               </div>
 
               {!showKidsModule && !showActiveModule && !showPhysicalJobModule && !showPainModule && (
                 <div className="text-center text-gray-400 py-8">
-                  <p>Nu ai selectat nicio situație specifică la pasul anterior.</p>
-                  <p className="text-sm mt-2">Poți continua mai departe.</p>
+                  <p>{language === 'en' ? 'You did not select any specific situation in the previous step.' : 'Nu ai selectat nicio situație specifică la pasul anterior.'}</p>
+                  <p className="text-sm mt-2">{language === 'en' ? 'You can continue.' : 'Poți continua mai departe.'}</p>
                 </div>
               )}
             </div>
@@ -564,9 +694,9 @@ export default function NicheQuick() {
           {step === 6 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-white mb-6">
-                4⃣ Pentru ce motiv te caută cel mai des?
+                {language === 'en' ? '4⃣ What is the main reason they usually come to you?' : '4⃣ Pentru ce motiv te caută cel mai des?'}
               </h2>
-              <p className="text-gray-300 text-sm mb-4">Poți alege mai multe:</p>
+              <p className="text-gray-300 text-sm mb-4">{language === 'en' ? 'You can choose more than one:' : 'Poți alege mai multe:'}</p>
               <div className="space-y-3">
                 {[
                   'Slăbit',
@@ -585,7 +715,7 @@ export default function NicheQuick() {
                       onChange={() => toggleArray('mainReasons', reason)}
                       className="w-5 h-5"
                     />
-                    <span className="text-white">{reason}</span>
+                    <span className="text-white">{translateOption(reason)}</span>
                   </label>
                 ))}
               </div>
@@ -593,7 +723,7 @@ export default function NicheQuick() {
               {formData.mainReasons.length > 1 && (
                 <div className="mt-6 pt-6 border-t border-dark-200">
                   <label className="block text-gray-300 mb-3 font-semibold">
-                    Dacă ar fi să alegi UNUL principal?
+                    {language === 'en' ? 'If you had to choose ONE main reason?' : 'Dacă ar fi să alegi UNUL principal?'}
                   </label>
                   <div className="space-y-2">
                     {formData.mainReasons.map((reason) => (
@@ -611,7 +741,7 @@ export default function NicheQuick() {
                           }
                           className="w-5 h-5"
                         />
-                        <span className="text-white text-sm">{reason}</span>
+                        <span className="text-white text-sm">{translateOption(reason)}</span>
                       </label>
                     ))}
                   </div>
@@ -624,7 +754,7 @@ export default function NicheQuick() {
           {step === 7 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-white mb-6">
-                5⃣ Ce NU funcționează pentru ei acum?
+                {language === 'en' ? '5⃣ What is NOT working for them right now?' : '5⃣ Ce NU funcționează pentru ei acum?'}
               </h2>
               <div className="space-y-3">
                 {[
@@ -643,21 +773,21 @@ export default function NicheQuick() {
                       onChange={() => toggleArray('whatDoesntWork', issue)}
                       className="w-5 h-5"
                     />
-                    <span className="text-white">{issue}</span>
+                    <span className="text-white">{translateOption(issue)}</span>
                   </label>
                 ))}
               </div>
 
               <div className="mt-6">
                 <label className="block text-gray-300 mb-2 text-sm">
-                  Alt lucru care apare des la ei? (opțional)
+                  {language === 'en' ? 'Another recurring issue for them? (optional)' : 'Alt lucru care apare des la ei? (opțional)'}
                 </label>
                 <input
                   type="text"
                   value={formData.otherDoesntWork}
                   onChange={(e) => setFormData({ ...formData, otherDoesntWork: e.target.value })}
                   className="w-full bg-dark-300 text-white rounded-lg p-3"
-                  placeholder="ex: nu știu să gătească sănătos..."
+                  placeholder={language === 'en' ? 'ex: they do not know how to cook healthy meals...' : 'ex: nu știu să gătească sănătos...'}
                 />
               </div>
             </div>
@@ -667,9 +797,9 @@ export default function NicheQuick() {
           {step === 8 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-white mb-6">
-                6⃣ Ce îi blochează CU ADEVĂRAT?
+                {language === 'en' ? '6⃣ What is REALLY blocking them?' : '6⃣ Ce îi blochează CU ADEVĂRAT?'}
               </h2>
-              <p className="text-gray-300 text-sm mb-4">Care afirmație sună cel mai mult ca ei?</p>
+              <p className="text-gray-300 text-sm mb-4">{language === 'en' ? 'Which statement sounds most like them?' : 'Care afirmație sună cel mai mult ca ei?'}</p>
               <div className="space-y-3">
                 {[
                   '„Știu ce ar trebui să fac, dar nu mă țin"',
@@ -691,14 +821,14 @@ export default function NicheQuick() {
                       }
                       className="w-5 h-5"
                     />
-                    <span className="text-white">{block}</span>
+                    <span className="text-white">{translateOption(block)}</span>
                   </label>
                 ))}
               </div>
 
               <div className="mt-6">
                 <label className="block text-gray-300 mb-2 text-sm">
-                  Dacă ai spune asta în cuvintele tale? (opțional)
+                  {language === 'en' ? 'How would you say it in your own words? (optional)' : 'Dacă ai spune asta în cuvintele tale? (opțional)'}
                 </label>
                 <input
                   type="text"
@@ -707,7 +837,7 @@ export default function NicheQuick() {
                     setFormData({ ...formData, emotionalBlockCustom: e.target.value })
                   }
                   className="w-full bg-dark-300 text-white rounded-lg p-3"
-                  placeholder="ex: simt că nu mai am timp pentru mine..."
+                  placeholder={language === 'en' ? 'ex: I feel like I no longer have time for myself...' : 'ex: simt că nu mai am timp pentru mine...'}
                 />
               </div>
             </div>
@@ -717,7 +847,7 @@ export default function NicheQuick() {
           {step === 9 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-white mb-6">
-                7⃣ Ce NU vor sub nicio formă?
+                {language === 'en' ? '7⃣ What do they absolutely NOT want?' : '7⃣ Ce NU vor sub nicio formă?'}
               </h2>
               <div className="space-y-3">
                 {[
@@ -736,21 +866,21 @@ export default function NicheQuick() {
                       onChange={() => toggleArray('whatTheyDontWant', dontWant)}
                       className="w-5 h-5"
                     />
-                    <span className="text-white">{dontWant}</span>
+                    <span className="text-white">{translateOption(dontWant)}</span>
                   </label>
                 ))}
               </div>
 
               <div className="mt-6">
                 <label className="block text-gray-300 mb-2 text-sm">
-                  Alt lucru care îi respinge din start? (opțional)
+                  {language === 'en' ? 'Anything else that turns them off immediately? (optional)' : 'Alt lucru care îi respinge din start? (opțional)'}
                 </label>
                 <input
                   type="text"
                   value={formData.otherDontWant}
                   onChange={(e) => setFormData({ ...formData, otherDontWant: e.target.value })}
                   className="w-full bg-dark-300 text-white rounded-lg p-3"
-                  placeholder="ex: tone de story-uri pe zi..."
+                  placeholder={language === 'en' ? 'ex: tons of stories every day...' : 'ex: tone de story-uri pe zi...'}
                 />
               </div>
             </div>
@@ -762,7 +892,7 @@ export default function NicheQuick() {
               {/* Q8 */}
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-white mb-6">
-                  8⃣ Cum e relația lor cu sportul?
+                  {language === 'en' ? '8⃣ What is their relationship with sport like?' : '8⃣ Cum e relația lor cu sportul?'}
                 </h2>
                 <div className="space-y-3">
                   {[
@@ -785,14 +915,14 @@ export default function NicheQuick() {
                         }
                         className="w-5 h-5"
                       />
-                      <span className="text-white">{relationship}</span>
+                      <span className="text-white">{translateOption(relationship)}</span>
                     </label>
                   ))}
                 </div>
 
                 <div>
                   <label className="block text-gray-300 mb-2 text-sm">
-                    Ce e specific la relația lor cu sportul? (opțional)
+                    {language === 'en' ? 'What is specific about their relationship with sport? (optional)' : 'Ce e specific la relația lor cu sportul? (opțional)'}
                   </label>
                   <input
                     type="text"
@@ -801,7 +931,7 @@ export default function NicheQuick() {
                       setFormData({ ...formData, sportRelationshipSpecific: e.target.value })
                     }
                     className="w-full bg-dark-300 text-white rounded-lg p-3"
-                    placeholder="ex: au făcut sală înainte, dar nu cardio..."
+                    placeholder={language === 'en' ? 'ex: they used to lift, but not do cardio...' : 'ex: au făcut sală înainte, dar nu cardio...'}
                   />
                 </div>
               </div>
@@ -809,9 +939,9 @@ export default function NicheQuick() {
               {/* Q9 */}
               <div className="space-y-6 pt-6 border-t border-dark-200">
                 <h2 className="text-2xl font-bold text-white mb-6">
-                  9⃣ Cum vrei TU să se simtă când te urmăresc?
+                  {language === 'en' ? '9⃣ How do YOU want them to feel when they follow you?' : '9⃣ Cum vrei TU să se simtă când te urmăresc?'}
                 </h2>
-                <p className="text-gray-300 text-sm mb-4">Alege maxim 2:</p>
+                <p className="text-gray-300 text-sm mb-4">{language === 'en' ? 'Choose up to 2:' : 'Alege maxim 2:'}</p>
                 <div className="space-y-3">
                   {[
                     'Înțeleși',
@@ -840,7 +970,7 @@ export default function NicheQuick() {
                         }
                         className="w-5 h-5"
                       />
-                      <span className="text-white">{feeling}</span>
+                      <span className="text-white">{translateOption(feeling)}</span>
                     </label>
                   ))}
                 </div>
@@ -852,10 +982,10 @@ export default function NicheQuick() {
           {step === 11 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-white mb-6">
-                🔵 1⃣ De ce te-ar alege pe tine și nu pe alt antrenor?
+                {language === 'en' ? '🔵 1⃣ Why would they choose you instead of another coach?' : '🔵 1⃣ De ce te-ar alege pe tine și nu pe alt antrenor?'}
               </h2>
               <p className="text-gray-300 text-sm">
-                Răspuns scurt, clar (maxim 2 rânduri).
+                {language === 'en' ? 'Short, clear answer (maximum 2 lines).' : 'Răspuns scurt, clar (maxim 2 rânduri).'}
               </p>
               <textarea
                 value={formData.differentiation}
@@ -863,7 +993,7 @@ export default function NicheQuick() {
                 rows={2}
                 maxLength={220}
                 className="w-full bg-dark-300 text-white rounded-lg p-3 resize-none"
-                placeholder="ex: Pentru că simplific complet procesul pentru oameni ocupați și construiesc un plan realist pe termen lung."
+                placeholder={language === 'en' ? 'ex: Because I simplify the whole process for busy people and build a realistic long-term plan.' : 'ex: Pentru că simplific complet procesul pentru oameni ocupați și construiesc un plan realist pe termen lung.'}
               />
             </div>
           )}
@@ -872,9 +1002,9 @@ export default function NicheQuick() {
           {step === 12 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-white mb-6">
-                2⃣ Ce îi face să ezite chiar și când știu că ar trebui să înceapă?
+                {language === 'en' ? '2⃣ What makes them hesitate even when they know they should start?' : '2⃣ Ce îi face să ezite chiar și când știu că ar trebui să înceapă?'}
               </h2>
-              <p className="text-gray-300 text-sm mb-4">Alege maxim 2:</p>
+              <p className="text-gray-300 text-sm mb-4">{language === 'en' ? 'Choose up to 2:' : 'Alege maxim 2:'}</p>
               <div className="space-y-3">
                 {[
                   'Frica de eșec',
@@ -903,7 +1033,7 @@ export default function NicheQuick() {
                       }
                       className="w-5 h-5"
                     />
-                    <span className="text-white">{objection}</span>
+                    <span className="text-white">{translateOption(objection)}</span>
                   </label>
                 ))}
               </div>
@@ -914,7 +1044,7 @@ export default function NicheQuick() {
           <div className="flex gap-4 mt-8">
             {step > 1 && (
               <Button variant="secondary" onClick={() => setStep(step - 1)}>
-                Înapoi
+                {ui.back}
               </Button>
             )}
             {step < totalSteps ? (
@@ -928,7 +1058,7 @@ export default function NicheQuick() {
                 }
                 className="ml-auto"
               >
-                Continuă
+                {ui.continue}
               </Button>
             ) : (
               <Button
@@ -937,15 +1067,15 @@ export default function NicheQuick() {
                 disabled={generateMutation.isPending}
                 className="ml-auto"
               >
-                {generateMutation.isPending ? 'Generez Niche Builder...' : 'Generează Niche Builder →'}
+                {generateMutation.isPending ? ui.generating : ui.submit}
               </Button>
             )}
           </div>
 
           {generateMutation.isError && (
             <p className="text-red-500 mt-4">
-              Eroare:{' '}
-              {(generateMutation.error as any)?.response?.data?.error || 'Ceva nu a mers bine'}
+              {ui.errorPrefix}{' '}
+              {(generateMutation.error as any)?.response?.data?.error || ui.genericError}
             </p>
           )}
         </Card>
@@ -953,31 +1083,25 @@ export default function NicheQuick() {
         {generatedResult && (
           <Card className="mt-6">
             <div className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-200">
-              Niche Builder salvat automat în cont.
+              {ui.saved}
             </div>
             <div className="space-y-4">
               <div className="rounded-lg border border-dark-200 bg-dark-300 p-5">
-                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">Nișa</h3>
+                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">{ui.niche}</h3>
                 <p className="text-white">
-                  {getResultValue(generatedResult.niche, 'Nișa nu a fost generată complet.')}
+                  {getResultValue(generatedResult.niche, ui.nicheFallback)}
                 </p>
               </div>
               <div className="rounded-lg border border-dark-200 bg-dark-300 p-5">
-                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">Client Ideal</h3>
+                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">{ui.idealClient}</h3>
                 <p className="whitespace-pre-line text-white">
-                  {getResultValue(
-                    generatedResult.idealClient,
-                    'Clientul ideal nu a fost returnat complet. Reîncearcă generarea pentru profilul complet.'
-                  )}
+                  {getResultValue(generatedResult.idealClient, ui.idealClientFallback)}
                 </p>
               </div>
               <div className="rounded-lg border border-dark-200 bg-dark-300 p-5">
-                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">Poziționare</h3>
+                <h3 className="mb-2 text-sm font-bold uppercase text-slate-300/72">{ui.positioning}</h3>
                 <p className="whitespace-pre-line text-white">
-                  {getResultValue(
-                    generatedResult.positioning,
-                    'Mesajul de poziționare nu a fost returnat complet. Reîncearcă generarea.'
-                  )}
+                  {getResultValue(generatedResult.positioning, ui.positioningFallback)}
                 </p>
               </div>
             </div>

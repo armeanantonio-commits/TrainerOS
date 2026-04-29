@@ -44,7 +44,7 @@ export default function About() {
             <ul className="space-y-3 text-gray-300">
               <li>• Daily Idea Engine: idei zilnice complete (hook, script, CTA).</li>
               <li>• Niche Finder: clarifică poziționarea și clientul ideal.</li>
-              <li>• Content Feedback AI: analiză înainte de publicare.</li>
+              <li>• Content Review AI: analiză înainte de publicare.</li>
             </ul>
           </Card>
         </section>

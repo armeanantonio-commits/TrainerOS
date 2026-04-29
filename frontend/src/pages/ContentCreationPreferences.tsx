@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import Button from '@/components/Button';
 import Card from '@/components/Card';
+import { useI18n } from '@/hooks/useI18n';
 
 interface ContentCreationData {
   filmingLocation: string;
@@ -37,6 +38,7 @@ const deliveryStyleOptions = [
 export default function ContentCreationPreferences() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [step, setStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<ContentCreationData>({
@@ -109,7 +111,7 @@ export default function ContentCreationPreferences() {
 
   const handleSubmit = () => {
     if (!canGoNext()) {
-      setError('Completează întrebarea curentă înainte să continui.');
+      setError(t('prefs.requiredError'));
       return;
     }
     saveMutation.mutate(formData);
@@ -121,9 +123,9 @@ export default function ContentCreationPreferences() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-gray-400">
-              Întrebare {step} din {totalSteps}
+              {t('prefs.questionProgress', { current: step, total: totalSteps })}
             </span>
-            <span className="text-sm text-brand-500 font-semibold">Durată: 1–2 minute</span>
+            <span className="text-sm text-brand-500 font-semibold">{t('prefs.durationCreation')}</span>
           </div>
           <div className="w-full bg-dark-200 rounded-full h-2 overflow-hidden">
             <div
@@ -135,10 +137,10 @@ export default function ContentCreationPreferences() {
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-3 font-display">
-            Cum vrei să creezi content?
+            {t('creation.title')}
           </h1>
           <p className="text-gray-300 text-lg">
-            Răspunsurile tale devin context global pentru Daily Idea.
+            {t('creation.subtitle')}
           </p>
         </div>
 
@@ -146,23 +148,27 @@ export default function ContentCreationPreferences() {
           {step === 1 && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-white font-display">
-                1) Unde îți este cel mai ușor / natural să filmezi content?
+                {t('creation.q1')}
               </h2>
-              <p className="text-gray-400 text-sm">Tip răspuns: single-select</p>
-              {filmingLocationOptions.map((option) => (
+              <p className="text-gray-400 text-sm">{t('creation.singleSelect')}</p>
+              {[
+                { value: filmingLocationOptions[0], label: t('creation.location.home') },
+                { value: filmingLocationOptions[1], label: t('creation.location.gym') },
+                { value: filmingLocationOptions[2], label: t('creation.location.both') },
+              ].map((option) => (
                 <button
-                  key={option}
+                  key={option.value}
                   onClick={() => {
-                    setFormData({ ...formData, filmingLocation: option });
+                    setFormData({ ...formData, filmingLocation: option.value });
                     setError(null);
                   }}
                   className={`w-full text-left px-6 py-4 rounded-lg border-2 transition-all ${
-                    formData.filmingLocation === option
+                    formData.filmingLocation === option.value
                       ? 'border-brand-500 bg-brand-500/10 text-white'
                       : 'border-dark-200 hover:border-dark-100 text-gray-300'
                   }`}
                 >
-                  {option}
+                  {option.label}
                 </button>
               ))}
             </div>
@@ -171,32 +177,37 @@ export default function ContentCreationPreferences() {
           {step === 2 && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-white font-display">
-                2) Ce tip de content îți vine CEL MAI natural să faci?
+                {t('creation.q2')}
               </h2>
-              <p className="text-gray-400 text-sm">Tip răspuns: multi-select</p>
-              {naturalContentTypeOptions.map((option) => (
+              <p className="text-gray-400 text-sm">{t('creation.multiSelect')}</p>
+              {[
+                { value: naturalContentTypeOptions[0], label: t('creation.type.nutrition') },
+                { value: naturalContentTypeOptions[1], label: t('creation.type.training') },
+                { value: naturalContentTypeOptions[2], label: t('creation.type.relatable') },
+                { value: naturalContentTypeOptions[3], label: t('creation.type.story') },
+              ].map((option) => (
                 <button
-                  key={option}
-                  onClick={() => toggleMulti('naturalContentTypes', option)}
+                  key={option.value}
+                  onClick={() => toggleMulti('naturalContentTypes', option.value)}
                   className={`w-full text-left px-6 py-4 rounded-lg border-2 transition-all ${
-                    formData.naturalContentTypes.includes(option)
+                    formData.naturalContentTypes.includes(option.value)
                       ? 'border-brand-500 bg-brand-500/10 text-white'
                       : 'border-dark-200 hover:border-dark-100 text-gray-300'
                   }`}
                 >
-                  {option}
+                  {option.label}
                 </button>
               ))}
 
               <div>
                 <label className="block text-sm text-gray-400 mb-2">
-                  Alt format care te reprezintă? (opțional)
+                  {t('creation.otherFormat')}
                 </label>
                 <input
                   type="text"
                   value={formData.otherNaturalFormat}
                   onChange={(e) => setFormData({ ...formData, otherNaturalFormat: e.target.value })}
-                  placeholder="Scrie aici..."
+                  placeholder={t('creation.otherPlaceholder')}
                   className="w-full px-4 py-3 bg-dark-300 border border-dark-200 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
@@ -206,20 +217,25 @@ export default function ContentCreationPreferences() {
           {step === 3 && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-white font-display">
-                3) Când te gândești la content, ce ți se potrivește MAI MULT?
+                {t('creation.q3')}
               </h2>
-              <p className="text-gray-400 text-sm">Tip răspuns: multi-select</p>
-              {deliveryStyleOptions.map((option) => (
+              <p className="text-gray-400 text-sm">{t('creation.multiSelect')}</p>
+              {[
+                { value: deliveryStyleOptions[0], label: t('creation.delivery.camera') },
+                { value: deliveryStyleOptions[1], label: t('creation.delivery.voiceover') },
+                { value: deliveryStyleOptions[2], label: t('creation.delivery.broll') },
+                { value: deliveryStyleOptions[3], label: t('creation.delivery.mix') },
+              ].map((option) => (
                 <button
-                  key={option}
-                  onClick={() => toggleMulti('deliveryStyles', option)}
+                  key={option.value}
+                  onClick={() => toggleMulti('deliveryStyles', option.value)}
                   className={`w-full text-left px-6 py-4 rounded-lg border-2 transition-all ${
-                    formData.deliveryStyles.includes(option)
+                    formData.deliveryStyles.includes(option.value)
                       ? 'border-brand-500 bg-brand-500/10 text-white'
                       : 'border-dark-200 hover:border-dark-100 text-gray-300'
                   }`}
                 >
-                  {option}
+                  {option.label}
                 </button>
               ))}
             </div>
@@ -240,14 +256,14 @@ export default function ContentCreationPreferences() {
               }}
               disabled={step === 1}
             >
-              ← Înapoi
+              ← {t('common.back')}
             </Button>
 
             {step < totalSteps ? (
               <Button
                 onClick={() => {
                   if (!canGoNext()) {
-                    setError('Completează întrebarea curentă înainte să continui.');
+                    setError(t('prefs.requiredError'));
                     return;
                   }
                   setError(null);
@@ -255,11 +271,11 @@ export default function ContentCreationPreferences() {
                 }}
                 disabled={!canGoNext()}
               >
-                Următorul →
+                {t('prefs.next')}
               </Button>
             ) : (
               <Button onClick={handleSubmit} disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? 'Se salvează...' : '✓ Salvează preferințele'}
+                {saveMutation.isPending ? t('prefs.saving') : t('creation.save')}
               </Button>
             )}
           </div>
@@ -268,7 +284,7 @@ export default function ContentCreationPreferences() {
         {saveMutation.isError && (
           <Card className="mt-4 bg-red-500/10 border-red-500/50">
             <p className="text-red-400">
-              {(saveMutation.error as any)?.response?.data?.error || 'A apărut o eroare la salvare.'}
+              {(saveMutation.error as any)?.response?.data?.error || t('prefs.saveError')}
             </p>
           </Card>
         )}

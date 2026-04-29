@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createGeminiText } from '../lib/gemini.js';
 import type { GenerationPromptContext } from '../lib/generation-history.js';
 import { buildAntiRepeatPromptSection } from '../lib/generation-history.js';
+import { buildAiLanguageInstruction, normalizeLanguage, type SupportedLanguage } from '../lib/language.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -93,6 +94,7 @@ export interface GenerateNutritionReportInput {
   allergiesDetails?: string;
   excludedFoodsAndPreferences?: string;
   planStyle: 'exact-grams' | 'macros-plus-examples' | 'flexible-template' | 'full-day-with-alternatives';
+  language?: SupportedLanguage;
   generationContext?: GenerationPromptContext;
 }
 
@@ -659,8 +661,11 @@ export async function generateNutritionReport(
   const styleConfig = getPlanStyleConfig(input.planStyle);
   const pools = buildIngredientPools(input);
   const antiRepeatSection = buildAntiRepeatPromptSection(input.generationContext);
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
 
-  const prompt = `Ești un nutriționist senior și redactezi în limba română un raport complet, premium, branduit TrainerOS.org, inspirat din structura unui "Calorie, Macro and Portion Guide".
+  const prompt = `Ești un nutriționist senior și redactezi un raport complet, premium, branduit TrainerOS.org, inspirat din structura unui "Calorie, Macro and Portion Guide".
+
+${languageInstruction}
 
 Vreau un raport clar, practic și uman pentru clientul de mai jos. Raportul trebuie să includă următoarele secțiuni:
 1. Introducere și cum folosește ghidul
@@ -708,7 +713,7 @@ DATE NUTRIȚIONALE
 - Stil plan: ${input.planStyle}
 
 REGULI
-- Răspunde exclusiv în română.
+- Răspunde exclusiv în limba cerută mai sus.
 - Ton profesionist, cald, clar.
 - Nu folosi markdown.
 - Fii specific și util, fără umplutură.

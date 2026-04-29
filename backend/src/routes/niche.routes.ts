@@ -61,6 +61,13 @@ router.post(
 );
 
 router.post(
+  '/translate-profile',
+  authenticate,
+  requirePlan('FREE_TRIAL', 'STARTER', 'PRO', 'ELITE', 'MAX'),
+  nicheController.translateProfile
+);
+
+router.post(
   '/reset',
   authenticate,
   requirePlan('FREE_TRIAL', 'STARTER', 'PRO', 'ELITE', 'MAX'),

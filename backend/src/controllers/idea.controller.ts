@@ -9,6 +9,7 @@ import {
   releaseGenerationLock,
 } from '../lib/generation-lock.js';
 import { generateUniqueResult } from '../lib/generation-history.js';
+import { normalizeLanguage } from '../lib/language.js';
 
 const generateIdeaSchema = z.object({
   objective: z.enum(['lead-gen', 'engagement', 'education']).optional(),
@@ -33,6 +34,7 @@ export async function generate(req: Request, res: Response): Promise<void> {
     }
 
     const user = req.user;
+    const language = normalizeLanguage(user.preferredLanguage);
 
     // Check if user has niche set
     if (!user.niche) {
@@ -125,6 +127,7 @@ export async function generate(req: Request, res: Response): Promise<void> {
           icpProfile: user.icpProfile,
           contentPreferences: user.contentPreferences,
           objective: data.objective,
+          language,
           recentIdeas: recentIdeaContext,
           generationContext: {
             recentOutputs,
@@ -171,6 +174,7 @@ export async function generateMultiFormat(req: Request, res: Response): Promise<
     }
 
     const user = req.user;
+    const language = normalizeLanguage(user.preferredLanguage);
     const data = generateMultiFormatSchema.parse(req.body ?? {});
     const useGeneralIdea = data.general === true;
     const ideaNiche = useGeneralIdea
@@ -274,6 +278,7 @@ export async function generateMultiFormat(req: Request, res: Response): Promise<
           objective: 'lead-gen',
           recentIdeas: recentIdeaContext,
           general: useGeneralIdea,
+          language,
           generationContext: {
             recentOutputs,
             duplicateAttempt,
@@ -428,6 +433,7 @@ export async function structure(req: Request, res: Response): Promise<void> {
     }
 
     const user = req.user;
+    const language = normalizeLanguage(user.preferredLanguage);
 
     if (!user.niche) {
       res.status(400).json({
@@ -485,6 +491,7 @@ export async function structure(req: Request, res: Response): Promise<void> {
           ideaText: data.ideaText,
           niche,
           contentPreferences: user.contentPreferences,
+          language,
           generationContext: {
             recentOutputs,
             duplicateAttempt,

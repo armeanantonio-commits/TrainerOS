@@ -18,7 +18,7 @@ export default function Pricing() {
       features: [
         'Daily Idea: 100 seturi/lună',
         'Structurează Ideea: 90/lună',
-        'Mail Marketing: 60/lună',
+        'Email Marketing: 60/lună',
         'Generare Nutriție Client: 10/lună',
         'Chat TrainerOS: 300 întrebări/lună',
         'Content Review: 60/lună',
@@ -37,7 +37,7 @@ export default function Pricing() {
       features: [
         'Daily Idea: 400 seturi/lună',
         'Structurează Ideea: 450/lună',
-        'Mail Marketing: 150/lună',
+        'Email Marketing: 150/lună',
         'Generare Nutriție Client: 30/lună',
         'Chat TrainerOS: 900 întrebări/lună',
         'Content Review: nelimitat',
@@ -132,7 +132,7 @@ export default function Pricing() {
                 </Button>
               </Link>
 
-              <p className="text-center text-gray-400 text-sm">Fără card necesar. Anulezi oricând.</p>
+              <p className="text-center text-gray-400 text-sm">Fără card necesar. Poți anula oricând.</p>
             </Card>
           ))}
         </div>
@@ -146,7 +146,7 @@ export default function Pricing() {
               <span className="text-gray-300">4.9/5</span>
             </div>
             <div className="text-gray-300">
-              💰 Rambursare 14 zile
+              💰 Rambursare în 14 zile
             </div>
             <div className="text-gray-300">
               🔒 Plată securizată via Stripe
@@ -172,7 +172,7 @@ export default function Pricing() {
 
             <Card>
               <h3 className="text-white font-semibold mb-2">
-                Chiar nu trebuie să introduc cardul pentru free trial?
+                Chiar nu trebuie să introduc cardul pentru Free Trial?
               </h3>
               <p className="text-gray-300 text-sm">
                 Corect. Trial-ul de 7 zile este 100% gratuit, fără card. După ce expiră, poți decide dacă vrei să continui.
@@ -194,8 +194,8 @@ export default function Pricing() {
                 Pot să anulez oricând?
               </h3>
               <p className="text-gray-300 text-sm">
-                Da, absolut. Fără contracte pe termen lung. Anulezi cu un click, fără penalizări. Plus avem garanție
-                money-back 14 zile.
+                Da, absolut. Fără contracte pe termen lung. Anulezi cu un click, fără penalizări. În plus, ai garanție
+                de rambursare 14 zile.
               </p>
             </Card>
 

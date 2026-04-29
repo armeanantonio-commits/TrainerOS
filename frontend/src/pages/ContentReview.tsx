@@ -4,8 +4,10 @@ import { feedbackAPI } from '@/services/api';
 import Button from '@/components/Button';
 import Card from '@/components/Card';
 import ScoreBar from '@/components/ScoreBar';
+import { useI18n } from '@/hooks/useI18n';
 
 export default function ContentReview() {
+  const { t } = useI18n();
   const MAX_VIDEO_MB = 250;
   const MAX_VIDEO_BYTES = MAX_VIDEO_MB * 1024 * 1024;
   const inputPanelRef = useRef<HTMLDivElement | null>(null);
@@ -25,7 +27,17 @@ export default function ContentReview() {
   });
 
   const analyzeMutation = analysisType === 'text' ? analyzeTextMutation : analyzeVideoMutation;
-  const maxUploadErrorMessage = `Video-ul este prea mare. Limita este ${MAX_VIDEO_MB}MB.`;
+  const maxUploadErrorMessage = t('review.maxUploadError', { size: MAX_VIDEO_MB });
+  const textPlaceholder =
+    t('review.placeholderPrefix', { format: format.toUpperCase() }) +
+    '\n\n' +
+    t(
+      format === 'reel'
+        ? 'review.placeholder.reel'
+        : format === 'carousel'
+          ? 'review.placeholder.carousel'
+          : 'review.placeholder.story'
+    );
 
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -89,17 +101,17 @@ export default function ContentReview() {
           <div className="console-orb left-[-4rem] top-[-3rem] h-24 w-24 bg-cyan-300/18 animate-float-slow" />
           <div className="console-orb right-0 top-8 h-20 w-20 bg-emerald-300/16 animate-float-delay" />
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <span className="console-badge">Content Feedback</span>
+            <span className="console-badge">{t('review.badge')}</span>
           </div>
           <h1 className="mt-1 mb-3 text-3xl font-bold text-white font-display sm:text-4xl">
-            Feedback instant pe conținutul tău.{' '}
-            <span className="bg-gradient-to-r from-[#8CF8D4] via-[#72CAFF] to-[#A78BFA] bg-clip-text text-transparent">Nu mai posta pe orbește.</span>
+            {t('review.title')}{' '}
+            <span className="bg-gradient-to-r from-[#8CF8D4] via-[#72CAFF] to-[#A78BFA] bg-clip-text text-transparent">{t('review.highlight')}</span>
           </h1>
           <p className="max-w-2xl text-base text-slate-300/78">
-            Scrie textul postării — primești scor, sugestii concrete și CTA optimizat înainte să publici.
+            {t('review.subtitle')}
           </p>
           <p className="mt-1 text-xs text-slate-300/72">
-            🤖 Powered by AI • Personalizat pentru nișa ta
+            {t('review.powered')}
           </p>
         </div>
 
@@ -120,8 +132,8 @@ export default function ContentReview() {
                 }`}
               >
                 <div className="text-3xl mb-2">🎥</div>
-                <p className="text-white font-semibold">Video Analysis</p>
-                <p className="text-gray-400 text-xs mt-1">Upload + Whisper transcription</p>
+                <p className="text-white font-semibold">{t('review.videoAnalysis')}</p>
+                <p className="text-gray-400 text-xs mt-1">{t('review.videoDescription')}</p>
               </button>
               <button
                 type="button"
@@ -136,8 +148,8 @@ export default function ContentReview() {
                 }`}
               >
                 <div className="text-3xl mb-2">📝</div>
-                <p className="text-white font-semibold">Text Analysis</p>
-                <p className="text-gray-400 text-xs mt-1">Paste script directly</p>
+                <p className="text-white font-semibold">{t('review.textAnalysis')}</p>
+                <p className="text-gray-400 text-xs mt-1">{t('review.textDescription')}</p>
               </button>
             </div>
           </Card>
@@ -152,12 +164,12 @@ export default function ContentReview() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-white font-display">
-                    {analysisType === 'video' ? 'Video Analysis' : 'Text Analysis'}
+                    {analysisType === 'video' ? t('review.videoAnalysis') : t('review.textAnalysis')}
                   </h2>
                   <p className="text-gray-300 text-sm">
                     {analyzeMutation.isPending 
-                      ? (analysisType === 'video' ? 'Se transcrie și analizează...' : 'Se analizează...')
-                      : (analysisType === 'video' ? 'Upload video pentru transcription' : 'Scrie textul postării')}
+                      ? (analysisType === 'video' ? t('review.videoPending') : t('review.textPending'))
+                      : (analysisType === 'video' ? t('review.videoIdle') : t('review.textIdle'))}
                   </p>
                 </div>
               </div>
@@ -165,7 +177,7 @@ export default function ContentReview() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Format Selection */}
                 <div>
-                  <label className="block text-white font-semibold mb-3">Tip de conținut</label>
+                  <label className="block text-white font-semibold mb-3">{t('review.contentType')}</label>
                   <div className="grid grid-cols-3 gap-3">
                     {(['reel', 'carousel', 'story'] as const).map((f) => (
                       <button
@@ -191,7 +203,7 @@ export default function ContentReview() {
                 {analysisType === 'video' && (
                   <div>
                     <label className="block text-white font-semibold mb-3">
-                      Upload Video 🎥
+                      {t('review.uploadVideo')}
                     </label>
                     {!videoPreview ? (
                       <div className="rounded-[24px] border-2 border-dashed border-cyan-300/18 p-8 text-center transition-colors hover:border-cyan-300/42">
@@ -205,13 +217,13 @@ export default function ContentReview() {
                         <label htmlFor="video-upload" className="cursor-pointer">
                           <div className="text-6xl mb-4">🎬</div>
                           <p className="text-white font-semibold mb-2">
-                            Click to upload video
+                            {t('review.clickUpload')}
                           </p>
                           <p className="text-gray-400 text-sm">
-                            MP4, MOV, AVI • Max {MAX_VIDEO_MB}MB
+                            {t('review.maxVideo', { size: MAX_VIDEO_MB })}
                           </p>
                           <p className="text-brand-500 text-xs mt-2">
-                            ✨ Whisper will transcribe audio automatically
+                            {t('review.whisperHint')}
                           </p>
                         </label>
                       </div>
@@ -237,7 +249,7 @@ export default function ContentReview() {
                             }}
                             className="text-red-500 hover:text-red-400 text-sm"
                           >
-                            Remove
+                            {t('review.remove')}
                           </button>
                         </div>
                       </div>
@@ -254,23 +266,17 @@ export default function ContentReview() {
                 {analysisType === 'text' && (
                   <div>
                     <label className="block text-white font-semibold mb-3">
-                      Textul postării (hook + script + CTA)
+                      {t('review.postText')}
                     </label>
                     <textarea
                       value={contentText}
                       onChange={(e) => setContentText(e.target.value)}
-                      placeholder={`Exemplu pentru ${format.toUpperCase()}:\n\n${
-                        format === 'reel'
-                          ? 'Hook: De ce nu slăbești?\n\nScript:\nScena 1: Sari micul dejun → Corp stochează grăsime\nScena 2: Alegi cardio → Pierzi mușchi, nu grăsime\nScena 3: Te înfometezi → Metabolism scade\n\nCTA: Vrei să slăbești CORECT? Scrie PLAN în DM'
-                          : format === 'carousel'
-                          ? 'Slide 1: 5 greșeli care îți sabotează slăbitul\nSlide 2: ❌ Sari micul dejun\nSlide 3: ❌ Doar cardio\nSlide 4: ❌ Dietă extremă\nSlide 5: ✅ Soluția?\nSlide 6: Scrie PLAN în DM pentru program personalizat'
-                          : 'Scene 1: Problemă (3s) - Te-ai săturat de diete?\nScene 2: Agitație (3s) - Toate dietele eșuează\nScene 3: Soluție (5s) - Există o metodă\nScene 4: CTA (4s) - Scrie SLĂBIRE în DM'
-                      }`}
+                      placeholder={textPlaceholder}
                       rows={12}
                       className="console-input min-h-[18rem] resize-none"
                     />
                     <p className="text-gray-400 text-sm mt-2">
-                      {contentText.length} caractere • Include hook, script și CTA
+                      {t('review.characterCount', { count: contentText.length })}
                     </p>
                   </div>
                 )}
@@ -283,27 +289,27 @@ export default function ContentReview() {
                   isLoading={analyzeMutation.isPending}
                 >
                   {analyzeMutation.isPending 
-                    ? (analysisType === 'video' ? '🎙️ Se transcrie și analizează...' : 'Se analizează...') 
-                    : (analysisType === 'video' ? '🎥 Transcrie & Analizează Video' : 'Analizează Textul')}
+                    ? (analysisType === 'video' ? t('review.videoSubmitPending') : t('review.textPending'))
+                    : (analysisType === 'video' ? t('review.transcribeAnalyze') : t('review.analyzeText'))}
                 </Button>
               </form>
 
               {analyzeMutation.isError && (
                 <div className="mt-6 rounded-[22px] border border-red-500/40 bg-red-500/10 p-4">
                   <p className="text-red-500 text-sm font-semibold mb-2">
-                    ❌ Analiza a eșuat
+                    {t('review.analysisFailed')}
                   </p>
                   <p className="text-red-400 text-xs">
                     {(analyzeMutation.error as any)?.response?.status === 413
                       ? maxUploadErrorMessage
                       : (analyzeMutation.error as any)?.response?.data?.error || 
                         (analyzeMutation.error as any)?.message || 
-                        'Verifică formatul fișierului și încearcă din nou.'}
+                        t('review.fileFormatError')}
                   </p>
                   {(analyzeMutation.error as any)?.response?.data?.details && (
                     <details className="mt-2">
                       <summary className="text-red-400 text-xs cursor-pointer hover:text-red-300">
-                        Detalii tehnice (pentru debugging)
+                        {t('review.techDetails')}
                       </summary>
                       <pre className="text-red-300 text-xs mt-2 overflow-auto max-h-40 p-2 bg-red-900/20 rounded">
                         {(analyzeMutation.error as any).response.data.details}
@@ -325,14 +331,14 @@ export default function ContentReview() {
                       <span className="text-2xl text-slate-950">✓</span>
                     </div>
                     <div>
-                      <h3 className="text-white font-bold text-lg">Analiză completă</h3>
+                      <h3 className="text-white font-bold text-lg">{t('review.complete')}</h3>
                       <p className="text-gray-300 text-sm capitalize">
-                        {format} • {analysisType === 'video' ? 'Video cu transcription' : `${contentText.length} caractere`}
+                        {format} • {analysisType === 'video' ? t('review.videoWithTranscription') : t('review.characters', { count: contentText.length })}
                       </p>
                     </div>
                   </div>
                   <Button variant="outline" onClick={handleReset}>
-                    Analizează alt conținut
+                    {t('review.analyzeAnother')}
                   </Button>
                 </div>
               </Card>
@@ -343,7 +349,7 @@ export default function ContentReview() {
               <Card className="mb-6">
                 <h3 className="text-xl font-bold text-white mb-4 font-display flex items-center gap-2">
                   <span className="text-2xl">🎙️</span>
-                  Transcription (Whisper AI)
+                  {t('review.transcription')}
                 </h3>
                 <div className="console-option p-4">
                   <p className="whitespace-pre-wrap leading-relaxed text-slate-300/78">
@@ -351,7 +357,7 @@ export default function ContentReview() {
                   </p>
                 </div>
                 <p className="text-gray-400 text-xs mt-2">
-                  ✨ Transcribed automatically using OpenAI Whisper
+                  {t('review.transcribed')}
                 </p>
               </Card>
             )}
@@ -359,12 +365,12 @@ export default function ContentReview() {
             {/* Scores */}
             <Card className="mb-6">
               <h2 className="text-2xl font-bold text-white mb-6 font-display">
-                Scoruri de Performanță
+                {t('review.scores')}
               </h2>
               <div className="grid md:grid-cols-2 gap-6">
-                <ScoreBar label="Claritate" score={analyzeMutation.data.data.clarityScore} />
-                <ScoreBar label="Relevanță" score={analyzeMutation.data.data.relevanceScore} />
-                <ScoreBar label="Încredere" score={analyzeMutation.data.data.trustScore} />
+                <ScoreBar label={t('review.clarity')} score={analyzeMutation.data.data.clarityScore} />
+                <ScoreBar label={t('review.relevance')} score={analyzeMutation.data.data.relevanceScore} />
+                <ScoreBar label={t('review.trust')} score={analyzeMutation.data.data.trustScore} />
                 <ScoreBar label="CTA" score={analyzeMutation.data.data.ctaScore} />
               </div>
             </Card>
@@ -374,7 +380,7 @@ export default function ContentReview() {
               <Card className="mb-6">
                 <h3 className="text-xl font-bold text-white mb-4 font-display flex items-center gap-2">
                   <span className="text-2xl">💡</span>
-                  Sugestii de Îmbunătățire
+                  {t('review.suggestions')}
                 </h3>
                 <ul className="space-y-3">
                   {analyzeMutation.data.data.suggestions.map(
@@ -394,7 +400,9 @@ export default function ContentReview() {
                         <div>
                           <p className="text-gray-200">{s.text}</p>
                           {s.category && (
-                            <p className="text-gray-500 text-xs mt-1">Categorie: {s.category}</p>
+                            <p className="text-gray-500 text-xs mt-1">
+                              {t('review.category', { category: s.category })}
+                            </p>
                           )}
                         </div>
                       </li>
@@ -408,7 +416,7 @@ export default function ContentReview() {
             {analyzeMutation.data.data.summary && (
               <Card>
                 <h3 className="text-xl font-bold text-white mb-4 font-display">
-                  Rezumat
+                  {t('review.summary')}
                 </h3>
                 <p className="text-gray-300 leading-relaxed">{analyzeMutation.data.data.summary}</p>
               </Card>

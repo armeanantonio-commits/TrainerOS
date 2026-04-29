@@ -4,8 +4,10 @@ import { authAPI } from '@/services/api';
 import Button from '@/components/Button';
 import Input from '@/components/Input';
 import Card from '@/components/Card';
+import { useI18n } from '@/hooks/useI18n';
 
 export default function ForgotPassword() {
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -19,10 +21,10 @@ export default function ForgotPassword() {
 
     try {
       const { data } = await authAPI.forgotPassword({ email });
-      setSuccess(data.message || 'If the email exists, a reset link has been sent.');
+      setSuccess(data.message || t('auth.forgotSuccess'));
     } catch (err: any) {
       const errorMessage = err.response?.data?.error || err.message;
-      setError(errorMessage || 'Request failed. Please try again.');
+      setError(errorMessage || t('auth.forgotFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -38,8 +40,8 @@ export default function ForgotPassword() {
             </div>
             <span className="text-white font-bold text-2xl font-display">TrainerOS</span>
           </Link>
-          <h1 className="text-3xl font-bold text-white mt-4 font-display">Forgot Password</h1>
-          <p className="text-gray-300 mt-2">Enter your email to receive a secure reset link.</p>
+          <h1 className="text-3xl font-bold text-white mt-4 font-display">{t('auth.forgotTitle')}</h1>
+          <p className="text-gray-300 mt-2">{t('auth.forgotSubtitle')}</p>
         </div>
 
         <Card>
@@ -65,13 +67,13 @@ export default function ForgotPassword() {
             />
 
             <Button type="submit" className="w-full" isLoading={isLoading}>
-              Send Reset Link
+              {t('auth.sendResetLink')}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
             <Link to="/login" className="text-brand-500 hover:text-brand-400 font-semibold">
-              Back to Login
+              {t('auth.backToLogin')}
             </Link>
           </div>
         </Card>

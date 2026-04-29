@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import Button from '@/components/Button';
+import { useI18n } from '@/hooks/useI18n';
 
 interface SetupOnboardingModalProps {
   isOpen: boolean;
@@ -47,6 +48,7 @@ export default function SetupOnboardingModal({
   onClose,
 }: SetupOnboardingModalProps) {
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!isOpen) {
@@ -100,7 +102,7 @@ export default function SetupOnboardingModal({
       <div className="w-full max-w-[22rem] rounded-2xl border border-brand-500/40 bg-dark-300 shadow-2xl shadow-black/40 sm:max-w-2xl">
         <div className="p-4 sm:p-8">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <p className="text-brand-500 text-sm font-semibold">Onboarding Setup</p>
+            <p className="text-brand-500 text-sm font-semibold">{t('onboarding.badge')}</p>
             <button
               type="button"
               onClick={onClose}
@@ -153,7 +155,7 @@ export default function SetupOnboardingModal({
               Închide
             </Button>
             <Button size="sm" onClick={() => navigate(nextStep.path)}>
-              Next →
+              {t('onboarding.next')}
             </Button>
           </div>
         </div>

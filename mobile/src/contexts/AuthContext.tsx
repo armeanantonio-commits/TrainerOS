@@ -6,6 +6,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  preferredLanguage?: 'ro' | 'en';
   niche?: string | null;
   icpProfile?: unknown;
   positioningMessage?: string | null;
@@ -18,7 +19,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<string>;
   logout: () => Promise<void>;
-  updateProfile: (data: { email?: string; name?: string }) => Promise<void>;
+  updateProfile: (data: { email?: string; name?: string; preferredLanguage?: 'ro' | 'en' }) => Promise<void>;
   refreshUser: () => Promise<User | null>;
 }
 
@@ -87,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const updateProfile = async (data: { email?: string; name?: string }) => {
+  const updateProfile = async (data: { email?: string; name?: string; preferredLanguage?: 'ro' | 'en' }) => {
     const response = await authAPI.updateProfile(data);
     if (response.data?.user) {
       setUser(response.data.user);

@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../constants/colors';
+import { useI18n } from '../hooks/useI18n';
 
 // Auth Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -61,6 +62,7 @@ function TrainerOSHeaderTitle() {
 }
 
 function MainTabs() {
+  const { t } = useI18n();
   return (
     <Tab.Navigator
       id="main-tabs"
@@ -98,7 +100,7 @@ function MainTabs() {
         name="DailyIdea"
         component={DailyIdeaScreen}
         options={{
-          title: 'Daily Idea',
+          title: t('nav.dailyIdeaTitle'),
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>💡</Text>,
         }}
       />
@@ -106,7 +108,7 @@ function MainTabs() {
         name="ContentReview"
         component={ContentReviewScreen}
         options={{
-          title: 'Review',
+          title: t('nav.review'),
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>📱</Text>,
         }}
       />
@@ -114,7 +116,7 @@ function MainTabs() {
         name="IdeaHistory"
         component={IdeaHistoryScreen}
         options={{
-          title: 'History',
+          title: t('nav.history'),
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>📚</Text>,
         }}
       />
@@ -122,7 +124,7 @@ function MainTabs() {
         name="Settings"
         component={SettingsScreen}
         options={{
-          title: 'Settings',
+          title: t('nav.settings'),
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>⚙️</Text>,
         }}
       />
@@ -149,6 +151,7 @@ function AuthStack() {
 }
 
 function MainStack() {
+  const { t } = useI18n();
   return (
     <Stack.Navigator
       id="main-stack"
@@ -171,62 +174,62 @@ function MainStack() {
       <Stack.Screen
         name="NicheFinder"
         component={NicheFinderScreen}
-        options={{ title: 'Niche Finder' }}
+        options={{ title: t('nav.nicheFinder') }}
       />
       <Stack.Screen
         name="NicheQuick"
         component={NicheQuickScreen}
-        options={{ title: 'Spune-mi Nișa Ta' }}
+        options={{ title: t('nav.nicheQuick') }}
       />
       <Stack.Screen
         name="NicheDiscover"
         component={NicheDiscoverScreen}
-        options={{ title: 'Descoperă Nișa Ta' }}
+        options={{ title: t('nav.nicheDiscover') }}
       />
       <Stack.Screen
         name="ContentPreferences"
         component={ContentPreferencesScreen}
-        options={{ title: 'Brand Voice' }}
+        options={{ title: t('nav.brandVoice') }}
       />
       <Stack.Screen
         name="IdeaDetail"
         component={IdeaDetailScreen}
-        options={{ title: 'Idea Details' }}
+        options={{ title: t('nav.ideaDetail') }}
       />
       <Stack.Screen
         name="IdeaStructurer"
         component={IdeaStructurerScreen}
-        options={{ title: 'Structurează Ideea' }}
+        options={{ title: t('nav.ideaStructurer') }}
       />
       <Stack.Screen
         name="ContentCreationPreferences"
         component={ContentCreationPreferencesScreen}
-        options={{ title: 'Cum vrei să creezi content?' }}
+        options={{ title: t('nav.contentCreation') }}
       />
       <Stack.Screen
         name="Chat"
         component={ChatScreen}
-        options={{ title: 'TrainerOS Chat' }}
+        options={{ title: t('nav.chat') }}
       />
       <Stack.Screen
         name="EmailMarketing"
         component={EmailMarketingScreen}
-        options={{ title: 'Email Marketing AI' }}
+        options={{ title: t('nav.emailMarketing') }}
       />
       <Stack.Screen
         name="ClientNutrition"
         component={ClientNutritionScreen}
-        options={{ title: 'Generare Nutriție Client' }}
+        options={{ title: t('nav.nutrition') }}
       />
       <Stack.Screen
         name="FeedbackHistory"
         component={FeedbackHistoryScreen}
-        options={{ title: 'Content Review History' }}
+        options={{ title: t('nav.feedbackHistory') }}
       />
       <Stack.Screen
         name="FeedbackDetail"
         component={FeedbackDetailScreen}
-        options={{ title: 'Feedback Detail' }}
+        options={{ title: t('nav.feedbackDetail') }}
       />
     </Stack.Navigator>
   );

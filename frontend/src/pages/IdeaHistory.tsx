@@ -4,8 +4,10 @@ import { ideaAPI } from '@/services/api';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 import { formatDate } from '@/lib/utils';
+import { useI18n } from '@/hooks/useI18n';
 
 export default function IdeaHistory() {
+  const { t } = useI18n();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['idea-history'],
     queryFn: () => ideaAPI.history(),
@@ -18,12 +20,12 @@ export default function IdeaHistory() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2 font-display">
-              Istoricul Ideilor
+              {t('history.title')}
             </h1>
-            <p className="text-gray-300">Toate ideile generate pentru content-ul tău</p>
+            <p className="text-gray-300">{t('history.subtitle')}</p>
           </div>
           <Link to="/daily-idea">
-            <Button>Generează Idee Nouă →</Button>
+            <Button>{t('history.generateNew')}</Button>
           </Link>
         </div>
 
@@ -31,7 +33,7 @@ export default function IdeaHistory() {
         {isLoading && (
           <Card className="text-center py-12">
             <div className="w-16 h-16 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-300">Se încarcă istoricul...</p>
+            <p className="text-gray-300">{t('history.loading')}</p>
           </Card>
         )}
 
@@ -39,8 +41,8 @@ export default function IdeaHistory() {
         {isError && (
           <Card className="bg-red-500/10 border-red-500 text-center py-12">
             <span className="text-5xl mb-4 block">❌</span>
-            <h3 className="text-xl font-bold text-white mb-2">Eroare la încărcare</h3>
-            <p className="text-gray-300">Nu am putut încărca istoricul. Încearcă din nou.</p>
+            <h3 className="text-xl font-bold text-white mb-2">{t('history.loadError')}</h3>
+            <p className="text-gray-300">{t('history.loadErrorText')}</p>
           </Card>
         )}
 
@@ -74,7 +76,7 @@ export default function IdeaHistory() {
                         const sceneText = scene.text ?? scene.description ?? '';
                         return (
                           <p key={`${idea.id}-scene-${sceneNumber}-${i}`} className="text-gray-400 text-sm">
-                            <span className="text-brand-500">Scenă {sceneNumber}:</span>{' '}
+                            <span className="text-brand-500">{t('history.scene', { number: sceneNumber })}</span>{' '}
                             {sceneText ? `${sceneText.substring(0, 80)}...` : ''}
                           </p>
                         );
@@ -102,7 +104,7 @@ export default function IdeaHistory() {
                       navigator.clipboard.writeText(idea.hook);
                     }}
                   >
-                    Copiază Hook
+                    {t('history.copyHook')}
                   </Button>
                   <Button
                     variant="outline"
@@ -112,13 +114,13 @@ export default function IdeaHistory() {
                       navigator.clipboard.writeText(idea.cta);
                     }}
                   >
-                    Copiază CTA
+                    {t('history.copyCta')}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                   >
-                    Vezi Detalii →
+                    {t('history.viewDetails')}
                   </Button>
                 </div>
               </Card>
@@ -131,13 +133,13 @@ export default function IdeaHistory() {
             <Card className="text-center py-12">
               <span className="text-5xl mb-4 block">📝</span>
               <h3 className="text-xl font-bold text-white mb-2">
-                Încă nu ai generat nicio idee
+                {t('history.emptyTitle')}
               </h3>
               <p className="text-gray-300 mb-6">
-                Începe să generezi idei de content și le vei găsi aici
+                {t('history.emptyText')}
               </p>
               <Link to="/daily-idea">
-                <Button>Generează Prima Idee →</Button>
+                <Button>{t('history.generateFirst')}</Button>
               </Link>
             </Card>
           )

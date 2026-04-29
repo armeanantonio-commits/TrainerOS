@@ -12,6 +12,7 @@ import {
   releaseGenerationLock,
 } from '../lib/generation-lock.js';
 import { generateUniqueResult } from '../lib/generation-history.js';
+import { normalizeLanguage } from '../lib/language.js';
 
 async function checkContentReviewLimit(req: Request, res: Response): Promise<boolean> {
   if (!req.user || req.user.isAdmin) {
@@ -70,6 +71,7 @@ export async function analyze(req: Request, res: Response): Promise<void> {
     }
 
     const user = req.user;
+    const language = normalizeLanguage(user.preferredLanguage);
 
     // Check if user has niche (optional but recommended)
     if (!user.niche) {
@@ -112,7 +114,7 @@ export async function analyze(req: Request, res: Response): Promise<void> {
         console.log(`✅ Audio extracted to: ${audioPath}`);
         
         console.log(`🎙️ Step 2: Transcribing audio with Whisper...`);
-        const transcriptionResult = await openaiService.transcribeAudio(audioPath);
+        const transcriptionResult = await openaiService.transcribeAudio(audioPath, language);
         transcription = transcriptionResult.text;
         
         console.log(`✅ Step 3: Transcription complete!`);
@@ -180,6 +182,7 @@ export async function analyze(req: Request, res: Response): Promise<void> {
         duration,
         niche: user.niche || undefined,
         transcription,
+        language,
         generationContext: {
           recentOutputs,
           duplicateAttempt,
@@ -250,6 +253,7 @@ export async function analyzeText(req: Request, res: Response): Promise<void> {
     }
 
     const user = req.user;
+    const language = normalizeLanguage(user.preferredLanguage);
     const canProceed = await checkContentReviewLimit(req, res);
     if (!canProceed) {
       return;
@@ -308,6 +312,7 @@ export async function analyzeText(req: Request, res: Response): Promise<void> {
           icpProfile: profile?.icpProfile as any,
           positioningMessage: profile?.positioningMessage || undefined,
           toneOfVoice: profile?.toneOfVoice || undefined,
+          language,
           generationContext: {
             recentOutputs,
             duplicateAttempt,

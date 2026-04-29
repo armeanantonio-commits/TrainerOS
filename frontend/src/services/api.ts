@@ -73,6 +73,8 @@ export const authAPI = {
   resetPassword: (data: { token: string; password: string }) =>
     api.post('/auth/reset-password', data),
   me: () => api.get('/auth/me'),
+  updateProfile: (data: { email?: string; name?: string; preferredLanguage?: 'ro' | 'en' }) =>
+    api.put('/auth/profile', data),
 };
 
 // Niche API
@@ -136,6 +138,12 @@ export const nicheAPI = {
   generatePresetOptions: () => api.post('/niche/generate/preset-options'),
   savePresetSelection: (data: { niche: string; description?: string }) =>
     api.post('/niche/preset-selection', data),
+  translateProfile: (data: {
+    niche?: string;
+    idealClient?: string;
+    positioning?: string;
+    targetLanguage: 'ro' | 'en';
+  }) => api.post('/niche/translate-profile', data),
   generateDiscover: (data: {
     gender: 'femei' | 'barbati' | 'ambele' | string;
     ageRanges: string[];

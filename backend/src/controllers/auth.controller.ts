@@ -16,6 +16,7 @@ const loginSchema = z.object({
 const updateProfileSchema = z.object({
   email: z.string().email().optional(),
   name: z.string().max(120).optional(),
+  preferredLanguage: z.enum(['ro', 'en']).optional(),
 });
 
 const activateAccountSchema = z.object({

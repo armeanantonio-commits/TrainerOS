@@ -10,18 +10,19 @@ import { useNavigation } from '@react-navigation/native';
 import { colors } from '../constants/colors';
 import Card from '../components/Card';
 import Button from '../components/Button';
+import { useI18n } from '../hooks/useI18n';
 
 export default function NicheFinderScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.kicker}>Niche Finder + Niche Builder</Text>
-        <Text style={styles.title}>Fără nișă clară, postezi degeaba.</Text>
+        <Text style={styles.kicker}>{t('niche.badge')}</Text>
+        <Text style={styles.title}>{t('niche.title')}</Text>
         <Text style={styles.subtitle}>
-          Află exact cui te adresezi, ce problemă rezolvi și cum te poziționezi — în mai puțin
-          de 5 minute.
+          {t('niche.subtitle')}
         </Text>
       </View>
 
@@ -31,19 +32,18 @@ export default function NicheFinderScreen() {
       >
         <Card style={styles.modeCard}>
           <Text style={styles.modeEmoji}>⚡</Text>
-          <Text style={styles.cardTitle}>"Știu deja nișa mea"</Text>
+          <Text style={styles.cardTitle}>{t('niche.quickTitle')}</Text>
           <Text style={styles.cardDescription}>
-            Răspunde la 10 întrebări despre clientul tău ideal — AI-ul va crea Niche Builder-ul
-            detaliat și nișa ta.
+            {t('niche.quickText')}
           </Text>
           <View style={styles.featuresBox}>
-            <Text style={styles.featureText}>✓ Demografic (gen, vârstă)</Text>
-            <Text style={styles.featureText}>✓ Rutina zilnică completă</Text>
-            <Text style={styles.featureText}>✓ Module condiționale personalizate</Text>
-            <Text style={styles.featureText}>✓ Niche Builder ultra-detaliat generat de AI</Text>
+            <Text style={styles.featureText}>{t('niche.featureDemographic')}</Text>
+            <Text style={styles.featureText}>{t('niche.featureRoutine')}</Text>
+            <Text style={styles.featureText}>{t('niche.featureModules')}</Text>
+            <Text style={styles.featureText}>{t('niche.featureBuilder')}</Text>
           </View>
           <Button
-            title="Spune-mi Nișa Ta →"
+            title={t('niche.quickButton')}
             onPress={() => navigation.navigate('NicheQuick')}
           />
         </Card>
@@ -55,19 +55,18 @@ export default function NicheFinderScreen() {
       >
         <Card style={styles.modeCard}>
           <Text style={styles.modeEmoji}>🔍</Text>
-          <Text style={styles.cardTitle}>"Descoperă Nișa Ta"</Text>
+          <Text style={styles.cardTitle}>{t('niche.discoverTitle')}</Text>
           <Text style={styles.cardDescription}>
-            Ghid complet în 3 faze: AI-ul propune 3 variante de nișă, tu alegi una, apoi
-            rafinăm împreună pentru rezultate maxime.
+            {t('niche.discoverText')}
           </Text>
           <View style={styles.featuresBox}>
-            <Text style={styles.featureText}>✓ Faza A: 6 întrebări despre experiența ta</Text>
-            <Text style={styles.featureText}>✓ Faza B: AI propune 3 variante de nișă</Text>
-            <Text style={styles.featureText}>✓ Faza C: Rafinare cu 5 întrebări detaliate</Text>
-            <Text style={styles.featureText}>✓ Nișă + Niche Builder personalizat final</Text>
+            <Text style={styles.featureText}>{t('niche.featurePhaseA')}</Text>
+            <Text style={styles.featureText}>{t('niche.featurePhaseB')}</Text>
+            <Text style={styles.featureText}>{t('niche.featurePhaseC')}</Text>
+            <Text style={styles.featureText}>{t('niche.featureFinal')}</Text>
           </View>
           <Button
-            title="Află Nișa Ta →"
+            title={t('niche.discoverButton')}
             onPress={() => navigation.navigate('NicheDiscover')}
             variant="outline"
           />

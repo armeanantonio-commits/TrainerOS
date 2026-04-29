@@ -13,6 +13,7 @@ import { colors } from '../constants/colors';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { authAPI, ideaAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 interface IdeaScene {
   scene?: number;
@@ -41,7 +42,7 @@ interface MultiFormatIdeas {
   story?: IdeaData;
 }
 
-const getHookText = (idea: IdeaData) => idea.hook || idea.title || 'Ideea de azi';
+const getHookText = (idea: IdeaData, fallback: string) => idea.hook || idea.title || fallback;
 
 const getDescriptionText = (idea: IdeaData) => {
   if (idea.description) return idea.description;
@@ -99,6 +100,7 @@ const buildIdeasFromHistory = (ideas: IdeaData[]): MultiFormatIdeas | null => {
 export default function DailyIdeaScreen() {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [ideasByFormat, setIdeasByFormat] = useState<MultiFormatIdeas | null>(null);
   const [activeTab, setActiveTab] = useState<FormatKey>('reel');
   const [showNicheAlert, setShowNicheAlert] = useState(false);
@@ -132,7 +134,7 @@ export default function DailyIdeaScreen() {
       const message =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
-        'Failed to generate idea';
+        t('daily.generateError');
 
       // Recovery path: if backend generated but response was lost, pull latest set from history.
       try {
@@ -150,21 +152,21 @@ export default function DailyIdeaScreen() {
       }
 
       if (status === 429 || status === 403) {
-        Alert.alert('Daily limit reached', message);
+        Alert.alert(t('daily.limitReached'), message);
         return;
       }
 
       if (status === 400 && error?.response?.data?.nicheRequired) {
-        Alert.alert('Niche required', message);
+        Alert.alert(t('daily.nicheRequiredTitle'), message);
         return;
       }
 
       if (status === 401) {
-        Alert.alert('Session expired', 'Please log in again.');
+        Alert.alert(t('daily.sessionExpired'), t('daily.loginAgain'));
         return;
       }
 
-      Alert.alert('Error', message);
+      Alert.alert(t('daily.error'), message);
     },
   });
 
@@ -174,7 +176,7 @@ export default function DailyIdeaScreen() {
     }
     if (!hasNiche) {
       setShowNicheAlert(true);
-      Alert.alert('Niche required', 'Set your niche first from Niche Finder before generating ideas.');
+      Alert.alert(t('daily.nicheRequiredTitle'), t('daily.nicheRequired'));
       return;
     }
     generateMutation.mutate();
@@ -188,33 +190,33 @@ export default function DailyIdeaScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>💡 Idee Zilnică</Text>
+        <Text style={styles.title}>💡 {t('daily.title')}</Text>
         <Text style={styles.subtitle}>
-          Generează o idee de content personalizată pentru nișa ta
+          {t('daily.subtitle')}
         </Text>
       </View>
 
       {!ideasByFormat ? (
         <Card style={styles.generateCard}>
           <Text style={styles.emoji}>🚀</Text>
-          <Text style={styles.generateTitle}>Gata pentru o idee nouă?</Text>
+          <Text style={styles.generateTitle}>{t('daily.ready')}</Text>
           <Text style={styles.generateText}>
-            AI-ul va genera o idee de content bazată pe nișa ta și preferințele tale.
+            {t('daily.readyText')}
           </Text>
           {(!isUserLoading && !hasNiche) || showNicheAlert ? (
             <View style={styles.warningBox}>
               <Text style={styles.warningText}>
-                Mai întâi ai nevoie de o nișă. Completează Niche Finder ca să poți genera idei.
+                {t('daily.nicheRequired')}
               </Text>
               <Button
-                title="Mergi la Niche Finder"
+                title={t('daily.goToNiche')}
                 onPress={() => navigation.navigate('NicheFinder')}
                 variant="outline"
               />
             </View>
           ) : null}
           <Button
-            title="Generează Idee"
+            title={t('daily.generate')}
             onPress={handleGenerate}
             loading={generateMutation.isPending}
             style={styles.generateButton}
@@ -256,20 +258,20 @@ export default function DailyIdeaScreen() {
                 {(currentIdea.format || 'REEL').toUpperCase()}
               </Text>
             </View>
-            <Text style={styles.ideaTitle}>{getHookText(currentIdea)}</Text>
+            <Text style={styles.ideaTitle}>{getHookText(currentIdea, t('daily.defaultHook'))}</Text>
             {getDescriptionText(currentIdea) ? (
               <Text style={styles.ideaDescription}>{getDescriptionText(currentIdea)}</Text>
             ) : null}
             
             {normalizeScenes(currentIdea).length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>🎬 Script pe Scene</Text>
+                <Text style={styles.sectionTitle}>{t('daily.scriptScenes')}</Text>
                 {normalizeScenes(currentIdea).map((scene, index) => (
                   <View key={`${scene.sceneNumber}-${index}`} style={styles.sceneItem}>
-                    <Text style={styles.sceneNumber}>Scena {scene.sceneNumber}</Text>
+                    <Text style={styles.sceneNumber}>{t('daily.scene', { number: scene.sceneNumber })}</Text>
                     <Text style={styles.sceneText}>{scene.sceneText}</Text>
                     {scene.sceneVisual ? (
-                      <Text style={styles.sceneVisual}>🎥 Vizual: {scene.sceneVisual}</Text>
+                      <Text style={styles.sceneVisual}>{t('daily.visual', { text: scene.sceneVisual })}</Text>
                     ) : null}
                   </View>
                 ))}
@@ -278,14 +280,14 @@ export default function DailyIdeaScreen() {
 
             {currentIdea.cta && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>📣 Call to Action</Text>
+                <Text style={styles.sectionTitle}>{t('daily.cta')}</Text>
                 <Text style={styles.ctaText}>{currentIdea.cta}</Text>
               </View>
             )}
 
             {currentIdea.reasoning ? (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>🧠 De ce funcționează</Text>
+                <Text style={styles.sectionTitle}>{t('daily.reasoning')}</Text>
                 <Text style={styles.reasoningText}>{currentIdea.reasoning}</Text>
               </View>
             ) : null}
@@ -293,7 +295,7 @@ export default function DailyIdeaScreen() {
           ) : null}
 
           <Button
-            title="Generează Altă Idee"
+            title={t('daily.generateAnother')}
             onPress={handleGenerate}
             loading={generateMutation.isPending}
             variant="outline"

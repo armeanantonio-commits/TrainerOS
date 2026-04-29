@@ -42,6 +42,7 @@ model User {
   // Brand Kit (Elite tier)
   brandKit      Json?
   toneOfVoice   String?
+  preferredLanguage String @default("ro")
   
   // Usage tracking
   ideasGeneratedThisMonth Int @default(0)

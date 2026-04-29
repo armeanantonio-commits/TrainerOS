@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { colors } from '../constants/colors';
@@ -6,6 +6,7 @@ import Card from '../components/Card';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { emailAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 type Objective = 'lead-magnet' | 'nurture' | 'sales' | 'reengagement';
 type EmailType = 'single' | 'welcome' | 'promo' | 'newsletter';
@@ -51,14 +52,19 @@ function SelectRow<T extends string>({
 }
 
 export default function EmailMarketingScreen() {
+  const { language: platformLanguage, t } = useI18n();
   const [topic, setTopic] = useState('');
   const [objective, setObjective] = useState<Objective>('nurture');
   const [emailType, setEmailType] = useState<EmailType>('single');
   const [tone, setTone] = useState<Tone>('friendly');
-  const [language, setLanguage] = useState<Language>('ro');
+  const [language, setLanguage] = useState<Language>(platformLanguage);
   const [offer, setOffer] = useState('');
   const [audiencePain, setAudiencePain] = useState('');
   const [ctaGoal, setCtaGoal] = useState('');
+
+  useEffect(() => {
+    setLanguage(platformLanguage);
+  }, [platformLanguage]);
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -80,61 +86,60 @@ export default function EmailMarketingScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.eyebrow}>EMAIL MARKETING AI</Text>
-      <Text style={styles.title}>Generează emailuri care convertesc</Text>
+      <Text style={styles.eyebrow}>{t('email.eyebrow')}</Text>
+      <Text style={styles.title}>{t('email.title')}</Text>
       <Text style={styles.subtitle}>
-        TrainerOS folosește automat contextul tău global (nișă, ICP, poziționare și preferințe)
-        pentru a crea emailuri relevante pentru business-ul tău fitness.
+        {t('email.subtitle')}
       </Text>
 
       <Card style={styles.card}>
-        <Text style={styles.formTitle}>Email</Text>
+        <Text style={styles.formTitle}>{t('email.formTitle')}</Text>
 
         <Input
-          label="Subiect email"
+          label={t('email.topic')}
           value={topic}
           onChangeText={setTopic}
-          placeholder="Ex: De ce mamele după sarcină nu slăbesc deși mănâncă puțin"
+          placeholder={t('email.placeholder.topic')}
         />
 
         <SelectRow
-          label="Obiectiv"
+          label={t('email.objective')}
           value={objective}
           onChange={(value) => setObjective(value as Objective)}
           options={[
-            { value: 'nurture', text: 'Încălzire lead-uri' },
-            { value: 'lead-magnet', text: 'Lead magnet' },
-            { value: 'sales', text: 'Vânzare' },
-            { value: 'reengagement', text: 'Reactivare' },
+            { value: 'nurture', text: t('email.objective.nurture') },
+            { value: 'lead-magnet', text: t('email.objective.leadMagnet') },
+            { value: 'sales', text: t('email.objective.sales') },
+            { value: 'reengagement', text: t('email.objective.reengagement') },
           ]}
         />
 
         <SelectRow
-          label="Tip email"
+          label={t('email.type')}
           value={emailType}
           onChange={(value) => setEmailType(value as EmailType)}
           options={[
-            { value: 'single', text: 'Email unic' },
-            { value: 'welcome', text: 'Bun venit' },
-            { value: 'promo', text: 'Promoțional' },
-            { value: 'newsletter', text: 'Newsletter' },
+            { value: 'single', text: t('email.type.single') },
+            { value: 'welcome', text: t('email.type.welcome') },
+            { value: 'promo', text: t('email.type.promo') },
+            { value: 'newsletter', text: t('email.type.newsletter') },
           ]}
         />
 
         <SelectRow
-          label="Ton"
+          label={t('email.tone')}
           value={tone}
           onChange={(value) => setTone(value as Tone)}
           options={[
-            { value: 'friendly', text: 'Prietenos' },
-            { value: 'empathetic', text: 'Empatic' },
-            { value: 'authoritative', text: 'Autoritar' },
-            { value: 'direct', text: 'Direct' },
+            { value: 'friendly', text: t('email.tone.friendly') },
+            { value: 'empathetic', text: t('email.tone.empathetic') },
+            { value: 'authoritative', text: t('email.tone.authoritative') },
+            { value: 'direct', text: t('email.tone.direct') },
           ]}
         />
 
         <SelectRow
-          label="Limbă"
+          label={t('email.language')}
           value={language}
           onChange={(value) => setLanguage(value as Language)}
           options={[
@@ -144,28 +149,28 @@ export default function EmailMarketingScreen() {
         />
 
         <Input
-          label="Ofertă (opțional)"
+          label={t('email.offerOptional')}
           value={offer}
           onChangeText={setOffer}
-          placeholder="Ex: Program 12 săptămâni pentru mame"
+          placeholder={t('email.placeholder.offer')}
         />
 
         <Input
-          label="Pain point audiență (opțional)"
+          label={t('email.audiencePainOptional')}
           value={audiencePain}
           onChangeText={setAudiencePain}
-          placeholder="Ex: nu au timp, energie scăzută, lipsă consistență"
+          placeholder={t('email.placeholder.pain')}
         />
 
         <Input
-          label="Scop CTA (opțional)"
+          label={t('email.ctaGoalOptional')}
           value={ctaGoal}
           onChangeText={setCtaGoal}
-          placeholder="Ex: răspuns în email / DM keyword / booking call"
+          placeholder={t('email.placeholder.cta')}
         />
 
         <Button
-          title="Generează Email →"
+          title={t('email.generate')}
           onPress={() => generateMutation.mutate()}
           loading={generateMutation.isPending}
           disabled={topic.trim().length < 5}
@@ -173,32 +178,32 @@ export default function EmailMarketingScreen() {
 
         {generateMutation.isError ? (
           <Text style={styles.errorText}>
-            {(generateMutation.error as any)?.response?.data?.error || 'Nu am putut genera emailul.'}
+            {(generateMutation.error as any)?.response?.data?.error || t('email.error')}
           </Text>
         ) : null}
       </Card>
 
       {result ? (
         <Card>
-          <Text style={styles.resultTitle}>Output</Text>
+          <Text style={styles.resultTitle}>{t('email.output')}</Text>
 
-          <Text style={styles.blockTitle}>Subject options</Text>
+          <Text style={styles.blockTitle}>{t('email.subjectOptions')}</Text>
           {result.subjectOptions?.map((subject, idx) => (
             <Text key={`${subject}-${idx}`} style={styles.resultText}>
               {idx + 1}. {subject}
             </Text>
           ))}
 
-          <Text style={styles.blockTitle}>Preview text</Text>
+          <Text style={styles.blockTitle}>{t('email.previewText')}</Text>
           <Text style={styles.resultText}>{result.previewText}</Text>
 
-          <Text style={styles.blockTitle}>Email body</Text>
+          <Text style={styles.blockTitle}>{t('email.body')}</Text>
           <Text style={styles.resultText}>{result.body}</Text>
 
           <Text style={styles.blockTitle}>CTA</Text>
           <Text style={styles.resultText}>{result.cta}</Text>
 
-          <Text style={styles.blockTitle}>Angles</Text>
+          <Text style={styles.blockTitle}>{t('email.angles')}</Text>
           {result.angles?.map((angle, idx) => (
             <Text key={`${angle}-${idx}`} style={styles.resultText}>• {angle}</Text>
           ))}

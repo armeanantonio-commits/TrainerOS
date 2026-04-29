@@ -14,6 +14,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import { contentAPI } from '../services/api';
+import { useI18n } from '../hooks/useI18n';
 
 interface BrandVoiceForm {
   perception: string[];
@@ -73,6 +74,7 @@ const sanitizeBrandVoice = (raw: unknown): BrandVoiceForm => {
 export default function ContentPreferencesScreen() {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<BrandVoiceForm>(DEFAULT_FORM);
 
@@ -103,14 +105,14 @@ export default function ContentPreferencesScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       await queryClient.invalidateQueries({ queryKey: ['content-preferences'] });
-      Alert.alert('Succes', 'Brand Voice salvat cu succes.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+      Alert.alert(t('prefs.success'), t('brand.saved'), [
+        { text: t('prefs.ok'), onPress: () => navigation.goBack() },
       ]);
     },
     onError: (error: any) => {
       const message =
-        error?.response?.data?.error || 'Nu am putut salva Brand Voice.';
-      Alert.alert('Eroare', message);
+        error?.response?.data?.error || t('brand.saveError');
+      Alert.alert(t('daily.error'), message);
     },
   });
 
@@ -130,7 +132,7 @@ export default function ContentPreferencesScreen() {
       return;
     }
     if (current.length >= max) {
-      Alert.alert('Limită', `Poți selecta maxim ${max} opțiuni.`);
+      Alert.alert(t('prefs.limit'), t('prefs.maxOptions', { max }));
       return;
     }
     setFormData({ ...formData, [field]: [...current, value] });
@@ -148,7 +150,7 @@ export default function ContentPreferencesScreen() {
 
   const handleNext = () => {
     if (!canGoNext()) {
-      Alert.alert('Validare', 'Te rog completează întrebarea curentă.');
+      Alert.alert(t('prefs.validation'), t('prefs.requiredShort'));
       return;
     }
     setStep((prev) => Math.min(TOTAL_STEPS, prev + 1));
@@ -156,7 +158,7 @@ export default function ContentPreferencesScreen() {
 
   const handleSubmit = () => {
     if (!canGoNext()) {
-      Alert.alert('Validare', 'Te rog completează întrebarea curentă.');
+      Alert.alert(t('prefs.validation'), t('prefs.requiredShort'));
       return;
     }
     saveMutation.mutate(formData);
@@ -185,9 +187,9 @@ export default function ContentPreferencesScreen() {
       <View style={styles.progressHeader}>
         <View style={styles.progressMetaRow}>
           <Text style={styles.progressStepText}>
-            Întrebare {step} din {TOTAL_STEPS}
+            {t('prefs.questionProgress', { current: step, total: TOTAL_STEPS })}
           </Text>
-          <Text style={styles.progressPercentText}>Durată: 2-3 minute</Text>
+          <Text style={styles.progressPercentText}>{t('prefs.durationBrand')}</Text>
         </View>
         <View style={styles.progressBarTrack}>
           <View style={[styles.progressBarFill, { width: `${completionPercent}%` }]} />
@@ -195,36 +197,36 @@ export default function ContentPreferencesScreen() {
       </View>
 
       <View style={styles.header}>
-        <Text style={styles.title}>Brand Voice</Text>
+        <Text style={styles.title}>{t('brand.title')}</Text>
         <Text style={styles.subtitle}>
-          Setează stilul tău o singură dată. De acum, toate scripturile sună ca tine.
+          {t('brand.subtitle')}
         </Text>
       </View>
 
       <Card style={styles.card}>
         {isLoadingExisting && (
-          <Text style={styles.loadingText}>Se încarcă Brand Voice existent...</Text>
+          <Text style={styles.loadingText}>{t('brand.loading')}</Text>
         )}
 
         {!isLoadingExisting && step === 1 && (
           <View>
             <Text style={styles.questionTitle}>
-              BV1) Cum vrei să fii perceput când cineva îți vede contentul?
+              {t('brand.q1')}
             </Text>
-            <Text style={styles.hint}>Alege maxim 2.</Text>
+            <Text style={styles.hint}>{t('brand.max2')}</Text>
             {[
-              'Direct și clar',
-              'Prietenos și cald',
-              'Funny și relatable',
-              'Serios și autoritar',
-              'Calm și educativ',
-              'Energic și “pushy” (pozitiv)',
+              { value: 'Direct și clar', label: t('brand.perception.direct') },
+              { value: 'Prietenos și cald', label: t('brand.perception.warm') },
+              { value: 'Funny și relatable', label: t('brand.perception.funny') },
+              { value: 'Serios și autoritar', label: t('brand.perception.authoritative') },
+              { value: 'Calm și educativ', label: t('brand.perception.calm') },
+              { value: 'Energic și “pushy” (pozitiv)', label: t('brand.perception.energetic') },
             ].map((option) => (
               <SelectOption
-                key={option}
-                label={option}
-                selected={formData.perception.includes(option)}
-                onPress={() => toggleWithLimit('perception', option, 2)}
+                key={option.value}
+                label={option.label}
+                selected={formData.perception.includes(option.value)}
+                onPress={() => toggleWithLimit('perception', option.value, 2)}
               />
             ))}
           </View>
@@ -232,17 +234,17 @@ export default function ContentPreferencesScreen() {
 
         {!isLoadingExisting && step === 2 && (
           <View>
-            <Text style={styles.questionTitle}>BV2) Cum vorbești, natural?</Text>
+            <Text style={styles.questionTitle}>{t('brand.q2')}</Text>
             {[
-              'Simplu, pe înțelesul tuturor',
-              'Mix: simplu + un pic tehnic',
-              'Mai tehnic (pentru oameni deja avansați)',
+              { value: 'Simplu, pe înțelesul tuturor', label: t('brand.style.simple') },
+              { value: 'Mix: simplu + un pic tehnic', label: t('brand.style.mix') },
+              { value: 'Mai tehnic (pentru oameni deja avansați)', label: t('brand.style.technical') },
             ].map((option) => (
               <SelectOption
-                key={option}
-                label={option}
-                selected={formData.naturalStyle === option}
-                onPress={() => setFormData({ ...formData, naturalStyle: option })}
+                key={option.value}
+                label={option.label}
+                selected={formData.naturalStyle === option.value}
+                onPress={() => setFormData({ ...formData, naturalStyle: option.value })}
               />
             ))}
           </View>
@@ -251,21 +253,21 @@ export default function ContentPreferencesScreen() {
         {!isLoadingExisting && step === 3 && (
           <View>
             <Text style={styles.questionTitle}>
-              BV3) Ce NU vrei să faci niciodată în content?
+              {t('brand.q3')}
             </Text>
-            <Text style={styles.hint}>Alege maxim 2.</Text>
+            <Text style={styles.hint}>{t('brand.max2')}</Text>
             {[
-              'Rușinare / motivare toxică',
-              'Promisiuni rapide',
-              'Extreme',
-              'Prea tehnic / rigid',
-              'Clickbait',
+              { value: 'Rușinare / motivare toxică', label: t('brand.never.shame') },
+              { value: 'Promisiuni rapide', label: t('brand.never.promises') },
+              { value: 'Extreme', label: t('brand.never.extreme') },
+              { value: 'Prea tehnic / rigid', label: t('brand.never.rigid') },
+              { value: 'Clickbait', label: t('brand.never.clickbait') },
             ].map((option) => (
               <SelectOption
-                key={option}
-                label={option}
-                selected={formData.neverDo.includes(option)}
-                onPress={() => toggleWithLimit('neverDo', option, 2)}
+                key={option.value}
+                label={option.label}
+                selected={formData.neverDo.includes(option.value)}
+                onPress={() => toggleWithLimit('neverDo', option.value, 2)}
               />
             ))}
           </View>
@@ -274,28 +276,28 @@ export default function ContentPreferencesScreen() {
         {!isLoadingExisting && step === 4 && (
           <View>
             <Text style={styles.questionTitle}>
-              BV4) Ce principiu vrei să repeți constant în contentul tău?
+              {t('brand.q4')}
             </Text>
-            <Text style={styles.hint}>Alege maxim 2.</Text>
+            <Text style={styles.hint}>{t('brand.max2')}</Text>
             {[
-              'Consistență > perfecțiune',
-              'Simplitate > programe complicate',
-              'Tehnică > greutăți mari',
-              'Obiceiuri > dietă extremă',
-              'Sănătate & performanță > doar estetic',
+              { value: 'Consistență > perfecțiune', label: t('brand.principle.consistency') },
+              { value: 'Simplitate > programe complicate', label: t('brand.principle.simplicity') },
+              { value: 'Tehnică > greutăți mari', label: t('brand.principle.technique') },
+              { value: 'Obiceiuri > dietă extremă', label: t('brand.principle.habits') },
+              { value: 'Sănătate & performanță > doar estetic', label: t('brand.principle.health') },
             ].map((option) => (
               <SelectOption
-                key={option}
-                label={option}
-                selected={formData.principles.includes(option)}
-                onPress={() => toggleWithLimit('principles', option, 2)}
+                key={option.value}
+                label={option.label}
+                selected={formData.principles.includes(option.value)}
+                onPress={() => toggleWithLimit('principles', option.value, 2)}
               />
             ))}
             <Input
-              label="Supapă: Scrie principiul tău (opțional, 1 rând)"
+              label={t('brand.customPrinciple')}
               value={formData.customPrinciple}
               onChangeText={(text) => setFormData({ ...formData, customPrinciple: text })}
-              placeholder="Ex: progres mic, zilnic"
+              placeholder={t('brand.customPrinciplePlaceholder')}
               maxLength={120}
             />
           </View>
@@ -304,19 +306,19 @@ export default function ContentPreferencesScreen() {
         {!isLoadingExisting && step === 5 && (
           <View>
             <Text style={styles.questionTitle}>
-              BV5) Care e stilul tău de “call-to-action”?
+              {t('brand.q5')}
             </Text>
             {[
-              'Soft (comentariu / întrebare)',
-              'Direct (scrie-mi X / trimite mesaj)',
-              'Educațional (salvează / share)',
-              'Mix',
+              { value: 'Soft (comentariu / întrebare)', label: t('brand.cta.soft') },
+              { value: 'Direct (scrie-mi X / trimite mesaj)', label: t('brand.cta.direct') },
+              { value: 'Educațional (salvează / share)', label: t('brand.cta.educational') },
+              { value: 'Mix', label: t('brand.cta.mix') },
             ].map((option) => (
               <SelectOption
-                key={option}
-                label={option}
-                selected={formData.ctaStyle === option}
-                onPress={() => setFormData({ ...formData, ctaStyle: option })}
+                key={option.value}
+                label={option.label}
+                selected={formData.ctaStyle === option.value}
+                onPress={() => setFormData({ ...formData, ctaStyle: option.value })}
               />
             ))}
           </View>
@@ -325,26 +327,26 @@ export default function ContentPreferencesScreen() {
         {!isLoadingExisting && step === 6 && (
           <View>
             <Text style={styles.questionTitle}>
-              BV6) Alege 3 cuvinte care descriu cel mai bine brandul tău
+              {t('brand.q6')}
             </Text>
-            <Text style={styles.hint}>Alege exact 3.</Text>
+            <Text style={styles.hint}>{t('brand.exact3')}</Text>
             {[
-              'Clar',
-              'Calm',
-              'Funny',
-              'Empatic',
-              'Disciplinat',
-              'Științific',
-              'Simplu',
-              'Motivațional',
-              'Elegant',
-              'No bullshit',
+              { value: 'Clar', label: t('brand.word.clear') },
+              { value: 'Calm', label: t('brand.word.calm') },
+              { value: 'Funny', label: t('brand.word.funny') },
+              { value: 'Empatic', label: t('brand.word.empathic') },
+              { value: 'Disciplinat', label: t('brand.word.disciplined') },
+              { value: 'Științific', label: t('brand.word.scientific') },
+              { value: 'Simplu', label: t('brand.word.simple') },
+              { value: 'Motivațional', label: t('brand.word.motivational') },
+              { value: 'Elegant', label: t('brand.word.elegant') },
+              { value: 'No bullshit', label: t('brand.word.noBullshit') },
             ].map((option) => (
               <SelectOption
-                key={option}
-                label={option}
-                selected={formData.brandWords.includes(option)}
-                onPress={() => toggleWithLimit('brandWords', option, 3)}
+                key={option.value}
+                label={option.label}
+                selected={formData.brandWords.includes(option.value)}
+                onPress={() => toggleWithLimit('brandWords', option.value, 3)}
               />
             ))}
           </View>
@@ -353,13 +355,13 @@ export default function ContentPreferencesScreen() {
         {!isLoadingExisting && step === 7 && (
           <View>
             <Text style={styles.questionTitle}>
-              BV7) Ce expresii folosești des în mod natural?
+              {t('brand.q7')}
             </Text>
-            <Text style={styles.hint}>Opțional, 1-3 exemple.</Text>
+            <Text style={styles.hint}>{t('brand.optionalExamples')}</Text>
             <Input
               value={formData.frequentPhrases}
               onChangeText={(text) => setFormData({ ...formData, frequentPhrases: text })}
-              placeholder='Ex: "pe scurt", "nu complica", "începem de aici"'
+              placeholder={t('brand.phrasesPlaceholder')}
               maxLength={180}
             />
           </View>
@@ -368,20 +370,20 @@ export default function ContentPreferencesScreen() {
         {!isLoadingExisting && step === 8 && (
           <View>
             <Text style={styles.questionTitle}>
-              BV8) Ce nuanță vrei să aibă umorul tău (dacă folosești)?
+              {t('brand.q8')}
             </Text>
-            <Text style={styles.hint}>Opțional.</Text>
+            <Text style={styles.hint}>{t('brand.optional')}</Text>
             {[
-              'Deloc',
-              'Subtil / ironic light',
-              'Relatable (POV, situații)',
-              'Direct și mai provocator (fără jigniri)',
+              { value: 'Deloc', label: t('brand.humor.none') },
+              { value: 'Subtil / ironic light', label: t('brand.humor.subtle') },
+              { value: 'Relatable (POV, situații)', label: t('brand.humor.relatable') },
+              { value: 'Direct și mai provocator (fără jigniri)', label: t('brand.humor.direct') },
             ].map((option) => (
               <SelectOption
-                key={option}
-                label={option}
-                selected={formData.humorTone === option}
-                onPress={() => setFormData({ ...formData, humorTone: option })}
+                key={option.value}
+                label={option.label}
+                selected={formData.humorTone === option.value}
+                onPress={() => setFormData({ ...formData, humorTone: option.value })}
               />
             ))}
           </View>
@@ -389,7 +391,7 @@ export default function ContentPreferencesScreen() {
 
         <View style={styles.actionsRow}>
           <Button
-            title="Înapoi"
+            title={t('prefs.back')}
             variant="outline"
             onPress={() => setStep((prev) => Math.max(1, prev - 1))}
             disabled={step === 1 || saveMutation.isPending}
@@ -398,14 +400,14 @@ export default function ContentPreferencesScreen() {
 
           {step < TOTAL_STEPS ? (
             <Button
-              title="Următorul"
+              title={t('prefs.next')}
               onPress={handleNext}
               disabled={saveMutation.isPending}
               style={styles.actionButton}
             />
           ) : (
             <Button
-              title={saveMutation.isPending ? 'Se salvează...' : 'Salvează Brand Voice'}
+              title={saveMutation.isPending ? t('prefs.saving') : t('brand.save')}
               onPress={handleSubmit}
               loading={saveMutation.isPending}
               style={styles.actionButton}

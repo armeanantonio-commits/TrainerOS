@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Button from './Button';
 import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/hooks/useI18n';
 
 export default function Navbar() {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { t } = useI18n();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navRef = useRef<HTMLElement | null>(null);
   const desktopNavItemBase =
@@ -17,16 +19,16 @@ export default function Navbar() {
 
   const navLinks = user
       ? [
-        { name: 'Dashboard', path: '/dashboard' },
-        { name: 'Niche Finder', path: '/niche-finder' },
-        { name: 'Daily Idea', path: '/daily-idea' },
-        { name: 'Nutriție', path: '/client-nutrition', disabled: true, badge: 'Upcoming' },
-        { name: 'Content Review', path: '/content-review' },
+        { name: t('nav.dashboard'), path: '/dashboard' },
+        { name: t('nav.nicheFinder'), path: '/niche-finder' },
+        { name: t('nav.dailyIdea'), path: '/daily-idea' },
+        { name: t('nav.nutrition'), path: '/client-nutrition', disabled: true, badge: t('nav.upcoming') },
+        { name: t('nav.contentReview'), path: '/content-review' },
       ]
     : [
-        { name: 'Acasă', path: '/' },
-        { name: 'Funcționalități', path: '/features' },
-        { name: 'Prețuri', path: '/pricing' },
+        { name: t('nav.home'), path: '/' },
+        { name: t('nav.features'), path: '/features' },
+        { name: t('nav.pricing'), path: '/pricing' },
       ];
 
   const closeMobileMenu = () => {
@@ -122,23 +124,23 @@ export default function Navbar() {
                 </div>
                 <Link to="/settings#plans">
                   <Button variant="primary" size="sm" className="!px-4 !py-2.5">
-                    Upgrade
+                    {t('nav.upgrade')}
                   </Button>
                 </Link>
                 <Button onClick={logout} variant="outline" size="sm">
-                  Logout
+                  {t('nav.logout')}
                 </Button>
               </>
             ) : (
               <>
                 <Link to="/login">
                   <Button variant="secondary" size="sm">
-                    Login
+                    {t('nav.login')}
                   </Button>
                 </Link>
                 <Link to="/register">
                   <Button variant="primary" size="sm">
-                    Start Trial
+                    {t('nav.startTrial')}
                   </Button>
                 </Link>
               </>
@@ -149,7 +151,7 @@ export default function Navbar() {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 text-white transition-colors hover:border-cyan-300/25 hover:bg-cyan-300/[0.08] md:hidden"
-            aria-label="Toggle menu"
+            aria-label={t('nav.toggleMenu')}
           >
             {mobileMenuOpen ? (
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,23 +207,23 @@ export default function Navbar() {
                   </div>
                   <Link to="/settings#plans" onClick={closeMobileMenu}>
                     <Button variant="primary" className="w-full">
-                      Upgrade Plan
+                      {t('nav.upgradePlan')}
                     </Button>
                   </Link>
                   <Button onClick={() => { logout(); closeMobileMenu(); }} variant="outline" className="w-full">
-                    Logout
+                    {t('nav.logout')}
                   </Button>
                 </>
               ) : (
                 <>
                   <Link to="/login" onClick={closeMobileMenu}>
                     <Button variant="secondary" className="w-full">
-                      Login
+                      {t('nav.login')}
                     </Button>
                   </Link>
                   <Link to="/register" onClick={closeMobileMenu}>
                     <Button variant="primary" className="w-full">
-                      Start Free Trial
+                      {t('nav.startFreeTrial')}
                     </Button>
                   </Link>
                 </>
