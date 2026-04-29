@@ -19,7 +19,6 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
 
     try {
@@ -79,8 +78,16 @@ export default function Login() {
             )}
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500 rounded-lg p-4">
-                <p className="text-red-500 text-sm">{error}</p>
+              <div className="bg-red-500/10 border border-red-500 rounded-lg p-4 flex items-start justify-between gap-3">
+                <p className="text-red-500 text-sm whitespace-pre-wrap">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => setError('')}
+                  className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                  aria-label="Dismiss login error"
+                >
+                  Close
+                </button>
               </div>
             )}
 
@@ -89,7 +96,10 @@ export default function Login() {
               label="Email"
               placeholder="nume@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (error) setError('');
+              }}
               required
             />
 
@@ -98,7 +108,10 @@ export default function Login() {
               label={t('auth.password')}
               placeholder="••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (error) setError('');
+              }}
               required
             />
 
