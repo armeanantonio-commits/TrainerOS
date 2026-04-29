@@ -1,22 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import api from '@/services/api';
-import { authAPI } from '@/services/api';
 import Button from '@/components/Button';
 import Card from '@/components/Card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useI18n } from '@/hooks/useI18n';
 
-type PreferredLanguage = 'ro' | 'en';
-
 export default function Settings() {
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   const { language, t } = useI18n();
   const plansRef = useRef<HTMLDivElement | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<'PRO' | 'MAX'>('PRO');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [promoCode, setPromoCode] = useState('');
-  const currentLanguage: PreferredLanguage = user?.preferredLanguage === 'en' ? 'en' : 'ro';
   const PROMO_CODE = 'LAUNCH2026';
   const planOptions = {
     PRO: {
@@ -112,16 +108,6 @@ export default function Settings() {
     },
   });
 
-  const languageMutation = useMutation({
-    mutationFn: async (preferredLanguage: PreferredLanguage) => {
-      const { data } = await authAPI.updateProfile({ preferredLanguage });
-      return data;
-    },
-    onSuccess: async () => {
-      await refreshUser();
-    },
-  });
-
   const handleUpgrade = () => {
     checkoutMutation.mutate({ cycle: billingCycle, plan: selectedPlan });
   };
@@ -164,45 +150,6 @@ export default function Settings() {
             )}
           </div>
         </div>
-
-        <Card className="mb-8">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="mb-2 text-xl font-semibold text-white">{t('settings.languageTitle')}</h2>
-              <p className="max-w-2xl text-sm text-slate-300/72">
-                {t('settings.languageText')}
-              </p>
-            </div>
-            <div className="flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-              {([
-                ['ro', t('settings.language.ro')],
-                ['en', t('settings.language.en')],
-              ] as const).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => languageMutation.mutate(value)}
-                  disabled={languageMutation.isPending || currentLanguage === value}
-                  className={`min-w-[104px] rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                    currentLanguage === value
-                      ? 'bg-[linear-gradient(135deg,#8CF8D4,#72CAFF)] text-slate-950'
-                      : 'text-slate-300 hover:bg-white/[0.06]'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {languageMutation.isSuccess ? (
-            <p className="mt-4 text-sm text-green-400">{t('settings.languageSaved')}</p>
-          ) : null}
-          {languageMutation.isError ? (
-            <p className="mt-4 text-sm text-red-400">
-              {(languageMutation.error as any)?.response?.data?.error || t('settings.languageError')}
-            </p>
-          ) : null}
-        </Card>
 
         {/* Subscription */}
         <div ref={plansRef}>
