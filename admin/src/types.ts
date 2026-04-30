@@ -167,4 +167,5 @@ export interface AdminUserProfileResponse {
       createdAt: string;
     }>;
   };
+  historyLimit: number;
 }

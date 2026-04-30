@@ -84,8 +84,10 @@ export async function getBilling(): Promise<AdminBillingResponse> {
   return response.data;
 }
 
-export async function getUserProfile(userId: string): Promise<AdminUserProfileResponse> {
-  const response = await api.get<AdminUserProfileResponse>(`/admin/users/${userId}/profile`);
+export async function getUserProfile(userId: string, historyLimit = 25): Promise<AdminUserProfileResponse> {
+  const response = await api.get<AdminUserProfileResponse>(`/admin/users/${userId}/profile`, {
+    params: { historyLimit },
+  });
   return response.data;
 }
 

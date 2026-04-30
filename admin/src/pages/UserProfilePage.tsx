@@ -5,11 +5,12 @@ import LoadingState from '../components/LoadingState';
 import { getUserProfile, parseApiError } from '../services/api';
 import type { AdminUserProfileResponse } from '../types';
 
+const historyOptions = [10, 25, 50, 100] as const;
+
 function formatDateTime(value: string | null): string {
   if (!value) {
     return '-';
   }
-
   return new Date(value).toLocaleString();
 }
 
@@ -25,6 +26,7 @@ export default function UserProfilePage() {
   const [data, setData] = useState<AdminUserProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [historyLimit, setHistoryLimit] = useState<number>(25);
 
   useEffect(() => {
     if (!userId) {
@@ -40,7 +42,7 @@ export default function UserProfilePage() {
       setError(null);
 
       try {
-        const response = await getUserProfile(userId);
+        const response = await getUserProfile(userId, historyLimit);
         if (!mounted) {
           return;
         }
@@ -61,16 +63,14 @@ export default function UserProfilePage() {
     return () => {
       mounted = false;
     };
-  }, [userId]);
+  }, [userId, historyLimit]);
 
   if (isLoading) {
     return <LoadingState label="Loading user profile..." />;
   }
-
   if (error) {
     return <ErrorState message={error} />;
   }
-
   if (!data) {
     return <ErrorState message="No user data available" />;
   }
@@ -82,11 +82,20 @@ export default function UserProfilePage() {
       <article className="panel">
         <div className="panel-header-row">
           <h3>User Profile</h3>
-          <Link className="secondary-btn" to="/users">
-            Back to users
-          </Link>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <select value={historyLimit} onChange={(event) => setHistoryLimit(Number(event.target.value))}>
+              {historyOptions.map((item) => (
+                <option key={item} value={item}>
+                  Last {item}
+                </option>
+              ))}
+            </select>
+            <Link className="secondary-btn" to="/users">
+              Back to users
+            </Link>
+          </div>
         </div>
-        <p className="muted">Detailed activity and generation stats for this account.</p>
+        <p className="muted">Per-user history, usage volume, and latest generated outputs.</p>
 
         <div className="kv-grid profile-kv-grid" style={{ marginTop: '14px' }}>
           <p>Name</p>
@@ -173,7 +182,7 @@ export default function UserProfilePage() {
       </article>
 
       <article className="panel">
-        <h3>Latest Tool Generations</h3>
+        <h3>Latest Tool Generations (Last {historyLimit})</h3>
 
         <div style={{ marginTop: '12px' }}>
           <p className="muted" style={{ marginBottom: '8px' }}>

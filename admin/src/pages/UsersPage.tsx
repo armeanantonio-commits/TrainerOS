@@ -7,21 +7,6 @@ import type { AdminUser, Plan } from '../types';
 
 const validPlans: Plan[] = ['FREE_TRIAL', 'STARTER', 'PRO', 'ELITE', 'MAX'];
 
-function formatDateTime(value: string | null): string {
-  if (!value) {
-    return '-';
-  }
-
-  return new Date(value).toLocaleString();
-}
-
-function truncateText(value: string, maxLength = 90): string {
-  if (value.length <= maxLength) {
-    return value;
-  }
-  return `${value.slice(0, maxLength)}...`;
-}
-
 export default function UsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,40 +72,10 @@ export default function UsersPage() {
     }
   };
 
-  const handlePlanChange = async (user: AdminUser, nextPlan: Plan) => {
-    setPendingUserId(user.id);
-    setError(null);
-
-    try {
-      await updateUser(user.id, { plan: nextPlan });
-      setUsers((current) => current.map((item) => (item.id === user.id ? { ...item, plan: nextPlan } : item)));
-    } catch (err) {
-      setError(parseApiError(err));
-    } finally {
-      setPendingUserId(null);
-    }
-  };
-
-  const handleManualActivate = async (user: AdminUser) => {
-    setPendingUserId(user.id);
-    setError(null);
-
-    try {
-      await updateUser(user.id, { isEmailVerified: true });
-      setUsers((current) =>
-        current.map((item) => (item.id === user.id ? { ...item, isEmailVerified: true } : item))
-      );
-    } catch (err) {
-      setError(parseApiError(err));
-    } finally {
-      setPendingUserId(null);
-    }
-  };
-
   return (
     <article className="panel">
       <h3>Users</h3>
-      <p className="muted">Manage plan, admin access, and manual account activation.</p>
+      <p className="muted">Quick list. Open a user for full profile and generation history.</p>
 
       <div className="filters-row">
         <input
@@ -172,11 +127,6 @@ export default function UsersPage() {
                 <tr>
                   <th>Email</th>
                   <th>Name</th>
-                  <th>Plan</th>
-                  <th>Email Verified</th>
-                  <th>Last Login</th>
-                  <th>Last Payment</th>
-                  <th>Last Idea</th>
                   <th>Admin</th>
                   <th>Created</th>
                   <th>Actions</th>
@@ -191,56 +141,22 @@ export default function UsersPage() {
                         {user.name || user.email}
                       </Link>
                     </td>
-                    <td>
-                      <select
-                        value={user.plan}
-                        onChange={(event) => handlePlanChange(user, event.target.value as Plan)}
-                        disabled={pendingUserId === user.id}
-                      >
-                        {validPlans.map((item) => (
-                          <option key={item} value={item}>
-                            {item}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>{user.isEmailVerified ? 'Yes' : 'No'}</td>
-                    <td>{formatDateTime(user.lastLoginAt)}</td>
-                    <td>{formatDateTime(user.lastPaymentAt)}</td>
-                    <td>
-                      {user.lastIdea ? (
-                        <>
-                          <strong>{user.lastIdea.format}</strong>: {truncateText(user.lastIdea.hook)}
-                          <div className="muted" style={{ marginTop: '4px' }}>
-                            {new Date(user.lastIdea.createdAt).toLocaleString()}
-                          </div>
-                        </>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
                     <td>{user.isAdmin ? 'Yes' : 'No'}</td>
                     <td>{new Date(user.createdAt).toLocaleDateString()}</td>
                     <td>
-                      {!user.isEmailVerified ? (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <Link className="secondary-btn" to={`/users/${user.id}`}>
+                          Open
+                        </Link>
                         <button
                           className="secondary-btn"
                           type="button"
-                          onClick={() => handleManualActivate(user)}
+                          onClick={() => handlePromoteToggle(user)}
                           disabled={pendingUserId === user.id}
-                          style={{ marginRight: '8px' }}
                         >
-                          Activate User
+                          {user.isAdmin ? 'Remove Admin' : 'Make Admin'}
                         </button>
-                      ) : null}
-                      <button
-                        className="secondary-btn"
-                        type="button"
-                        onClick={() => handlePromoteToggle(user)}
-                        disabled={pendingUserId === user.id}
-                      >
-                        {user.isAdmin ? 'Remove Admin' : 'Make Admin'}
-                      </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

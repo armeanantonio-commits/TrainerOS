@@ -24,6 +24,10 @@ const listUsersQuerySchema = z.object({
   status: z.enum(['active', 'trial', 'expired']).optional(),
 });
 
+const userProfileQuerySchema = z.object({
+  historyLimit: z.coerce.number().int().min(5).max(100).default(25),
+});
+
 const updateUserSchema = z
   .object({
     plan: z.nativeEnum(Plan).optional(),
@@ -403,6 +407,7 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
 export async function getUserProfile(req: Request, res: Response): Promise<void> {
   try {
     const { userId } = req.params;
+    const { historyLimit } = userProfileQuerySchema.parse(req.query);
 
     if (!userId) {
       res.status(400).json({ error: 'User id is required' });
@@ -474,7 +479,7 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
       prisma.idea.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: historyLimit,
         select: {
           id: true,
           format: true,
@@ -486,7 +491,7 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
       prisma.feedback.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: historyLimit,
         select: {
           id: true,
           fileType: true,
@@ -499,7 +504,7 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
       prisma.emailGeneration.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: historyLimit,
         select: {
           id: true,
           topic: true,
@@ -513,7 +518,7 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
       prisma.nutritionGeneration.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: historyLimit,
         select: {
           id: true,
           calories: true,
@@ -527,7 +532,7 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
       prisma.ideaStructureGeneration.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: historyLimit,
         select: {
           id: true,
           ideaText: true,
@@ -537,7 +542,7 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
       prisma.chatMessageUsage.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: historyLimit,
         select: {
           id: true,
           message: true,
@@ -547,7 +552,7 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
       prisma.calendarEntry.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: historyLimit,
         select: {
           id: true,
           title: true,
@@ -589,8 +594,13 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
         chatMessages: recentChatMessages,
         calendarEntries: recentCalendarEntries,
       },
+      historyLimit,
     });
   } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: error.errors });
+      return;
+    }
     res.status(500).json({ error: error.message || 'Failed to load user profile' });
   }
 }
