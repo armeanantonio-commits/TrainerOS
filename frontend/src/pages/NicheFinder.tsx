@@ -128,6 +128,10 @@ export default function NicheFinder() {
   };
 
   const handleWizardNext = () => {
+    if (wizardStep < 5 && !wizardAnswers[currentQuestion.field]?.trim()) {
+      return;
+    }
+
     if (wizardStep < 5) {
       setWizardStep(wizardStep + 1);
     } else {
@@ -498,7 +502,7 @@ export default function NicheFinder() {
                   onClick={handleWizardNext}
                   className="flex-1"
                   isLoading={wizardMutation.isPending}
-                  disabled={!wizardAnswers[currentQuestion.field]}
+                  disabled={wizardStep < 5 && !wizardAnswers[currentQuestion.field]?.trim()}
                 >
                   {wizardStep === 5 ? t('niche.finish') : t('niche.continue')}
                 </Button>

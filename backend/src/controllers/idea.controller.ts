@@ -19,6 +19,23 @@ const generateMultiFormatSchema = z.object({
   general: z.boolean().optional(),
 });
 
+const sceneSchema = z.object({
+  scene: z.number().int().min(1).max(5),
+  text: z.string().optional().default(''),
+  visual: z.string().optional().default(''),
+});
+
+const regenerateSceneSchema = z.object({
+  idea: z.object({
+    format: z.enum(['REEL', 'CAROUSEL', 'STORY']),
+    hook: z.string().min(3),
+    script: z.array(sceneSchema).default([]),
+    cta: z.string().min(3),
+    dmKeyword: z.string().optional().default(''),
+  }),
+  targetScene: z.number().int().min(1).max(5),
+});
+
 const structureIdeaSchema = z.object({
   ideaText: z.string().min(10).max(4000),
 });
@@ -553,6 +570,54 @@ export async function translate(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function regenerateScene(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const user = req.user;
+    const language = normalizeLanguage(user.preferredLanguage);
+    const data = regenerateSceneSchema.parse(req.body ?? {});
+    const ideaNiche = user.niche || 'fitness general pentru adulți din România care vor rezultate sustenabile';
+    const generationKey = acquireGenerationLock(user.id, 'daily-idea');
+
+    if (!generationKey) {
+      res.status(409).json(buildGenerationConflictPayload('daily-idea'));
+      return;
+    }
+
+    try {
+      const regenerated = await openaiService.regenerateDailyIdeaScene({
+        niche: ideaNiche,
+        format: data.idea.format,
+        hook: data.idea.hook,
+        cta: data.idea.cta,
+        dmKeyword: data.idea.dmKeyword || '',
+        script: data.idea.script.map((scene) => ({
+          scene: scene.scene,
+          text: scene.text || '',
+          visual: scene.visual || '',
+        })),
+        targetScene: data.targetScene,
+        contentPreferences: user.contentPreferences,
+        language,
+      });
+
+      res.json({ scene: regenerated });
+    } finally {
+      releaseGenerationLock(generationKey);
+    }
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: error.errors });
+      return;
+    }
+    res.status(500).json({ error: error.message || 'Failed to regenerate scene' });
+  }
+}
+
 export default {
   generate,
   generateMultiFormat,
@@ -560,4 +625,5 @@ export default {
   getById,
   structure,
   translate,
+  regenerateScene,
 };

@@ -248,7 +248,7 @@ export default function NicheQuick() {
   };
 
   const handleSubmit = () => {
-    if (!formData.gender || formData.ageRanges.length === 0 || !formData.differentiation.trim()) {
+    if (!formData.gender || formData.ageRanges.length === 0) {
       alert(ui.requiredAlert);
       return;
     }
@@ -982,7 +982,9 @@ export default function NicheQuick() {
           {step === 11 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-white mb-6">
-                {language === 'en' ? '🔵 1⃣ Why would they choose you instead of another coach?' : '🔵 1⃣ De ce te-ar alege pe tine și nu pe alt antrenor?'}
+                {language === 'en'
+                  ? '🔵 1⃣ Why would they choose you instead of another coach? (optional)'
+                  : '🔵 1⃣ De ce te-ar alege pe tine și nu pe alt antrenor? (opțional)'}
               </h2>
               <p className="text-gray-300 text-sm">
                 {language === 'en' ? 'Short, clear answer (maximum 2 lines).' : 'Răspuns scurt, clar (maxim 2 rânduri).'}
@@ -1053,8 +1055,7 @@ export default function NicheQuick() {
                 onClick={() => setStep(step + 1)}
                 disabled={
                   (step === 1 && !formData.gender) ||
-                  (step === 2 && formData.ageRanges.length === 0) ||
-                  (step === 11 && !formData.differentiation.trim())
+                  (step === 2 && formData.ageRanges.length === 0)
                 }
                 className="ml-auto"
               >

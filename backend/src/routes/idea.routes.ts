@@ -19,6 +19,13 @@ router.post(
 );
 
 router.post(
+  '/regenerate-scene',
+  authenticate,
+  requirePlan('FREE_TRIAL', 'STARTER', 'PRO', 'ELITE', 'MAX'),
+  ideaController.regenerateScene
+);
+
+router.post(
   '/structure',
   authenticate,
   requirePlan('FREE_TRIAL', 'STARTER', 'PRO', 'ELITE', 'MAX'),

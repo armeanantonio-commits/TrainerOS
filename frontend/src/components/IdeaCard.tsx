@@ -21,14 +21,17 @@ interface IdeaCardProps {
     hook: string;
     script: Scene[];
     cta: string;
+    dmKeyword?: string;
     reasoning?: string;
     objective?: string;
     conversionRate?: string;
   };
+  onRegenerateScene?: (sceneNumber: number) => void;
+  regeneratingScenes?: number[];
 }
 
-export default function IdeaCard({ idea }: IdeaCardProps) {
-  const { t } = useI18n();
+export default function IdeaCard({ idea, onRegenerateScene, regeneratingScenes = [] }: IdeaCardProps) {
+  const { t, language } = useI18n();
   const [copied, setCopied] = useState<string | null>(null);
   const format = (idea.format || 'REEL').toLowerCase();
   const normalizeSceneText = (value?: string) =>
@@ -44,6 +47,10 @@ export default function IdeaCard({ idea }: IdeaCardProps) {
     normalizeSceneText(rawScenes[rawScenes.length - 1]?.text ?? rawScenes[rawScenes.length - 1]?.description) === normalizedCta
       ? rawScenes.slice(0, -1)
       : rawScenes;
+  const existingSceneNumbers = new Set(
+    displayScenes.map((scene, idx) => scene.scene ?? scene.number ?? idx + 1).filter((sceneNumber) => sceneNumber >= 1 && sceneNumber <= 5)
+  );
+  const missingScenes = [1, 2, 3, 4, 5].filter((sceneNumber) => !existingSceneNumbers.has(sceneNumber));
 
   const handleCopy = async (text: string, type: string) => {
     await copyToClipboard(text);
@@ -101,9 +108,21 @@ export default function IdeaCard({ idea }: IdeaCardProps) {
                     key={`${sceneNumber}-${idx}`}
                     className="console-option p-4"
                   >
-                    <span className="text-console-accent font-bold text-sm">
-                      {t('ideaDetail.sceneLabel', { number: sceneNumber })}
-                    </span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-console-accent font-bold text-sm">
+                        {t('ideaDetail.sceneLabel', { number: sceneNumber })}
+                      </span>
+                      {onRegenerateScene && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onRegenerateScene(sceneNumber)}
+                          isLoading={regeneratingScenes.includes(sceneNumber)}
+                        >
+                          ↻
+                        </Button>
+                      )}
+                    </div>
                     {sceneText && <p className="mt-1 text-slate-200">{sceneText}</p>}
                     {sceneVisual && (
                       <p className="mt-2 text-xs text-slate-400">
@@ -113,6 +132,22 @@ export default function IdeaCard({ idea }: IdeaCardProps) {
                   </div>
                 );
               })}
+              {missingScenes.map((sceneNumber) => (
+                <div key={`missing-${sceneNumber}`} className="console-option p-4 border border-dashed border-cyan-300/30">
+                  {onRegenerateScene && (
+                    <div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onRegenerateScene(sceneNumber)}
+                        isLoading={regeneratingScenes.includes(sceneNumber)}
+                      >
+                        {language === 'en' ? `Generate scene ${sceneNumber}` : `Generează scena ${sceneNumber}`}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </Card>

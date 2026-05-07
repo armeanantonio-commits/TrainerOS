@@ -178,6 +178,16 @@ export const ideaAPI = {
   generate: (data?: { nicheId?: string }) =>
     api.post('/idea/generate', data || {}),
   generateMultiFormat: (data?: { general?: boolean }) => api.post('/idea/generate/multi-format', data || {}),
+  regenerateScene: (data: {
+    idea: {
+      format: 'REEL' | 'CAROUSEL' | 'STORY';
+      hook: string;
+      script: Array<{ scene: number; text?: string; visual?: string }>;
+      cta: string;
+      dmKeyword?: string;
+    };
+    targetScene: number;
+  }) => api.post('/idea/regenerate-scene', data),
   structure: (data: { ideaText: string }) => api.post('/idea/structure', data),
   history: () => api.get('/idea/history'),
   translate: (data: {

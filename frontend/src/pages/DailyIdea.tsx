@@ -11,6 +11,25 @@ import { useLocalizedNicheProfile } from '@/hooks/useLocalizedNicheProfile';
 const GENERAL_IDEA_PROMPT_COUNT_KEY = 'daily-idea-general-count';
 const GENERAL_IDEA_NICHE_PROMPT_SHOWN_KEY = 'daily-idea-niche-prompt-shown';
 
+type Scene = { scene?: number; number?: number; text?: string; description?: string; visual?: string };
+type IdeaPayload = {
+  id?: string;
+  format: 'REEL' | 'CAROUSEL' | 'STORY' | string;
+  hook: string;
+  script: Scene[];
+  cta: string;
+  dmKeyword?: string;
+  reasoning?: string;
+  objective?: string;
+  conversionRate?: number | string;
+};
+type MultiIdeas = {
+  reel: IdeaPayload;
+  carousel: IdeaPayload;
+  story: IdeaPayload;
+  source?: string;
+};
+
 export default function DailyIdea() {
   const outputRef = useRef<HTMLDivElement | null>(null);
   const generationLockRef = useRef(false);
@@ -40,7 +59,9 @@ export default function DailyIdea() {
   });
 
   const [activeTab, setActiveTab] = useState<'reel' | 'carousel' | 'story'>('reel');
-  const generatedIdeas = generateMutation.data?.data;
+  const [editableIdeas, setEditableIdeas] = useState<MultiIdeas | null>(null);
+  const [regeneratingScenes, setRegeneratingScenes] = useState<number[]>([]);
+  const generatedIdeas = editableIdeas || generateMutation.data?.data;
   const hasCompleteIdeaSet =
     !!generatedIdeas?.reel && !!generatedIdeas?.carousel && !!generatedIdeas?.story;
   const hasGeneratedIdea = generateMutation.isSuccess && hasCompleteIdeaSet;
@@ -60,8 +81,75 @@ export default function DailyIdea() {
     }
 
     setGenerationMode(mode);
+    setEditableIdeas(null);
     generationLockRef.current = true;
     generateMutation.mutate(mode);
+  };
+
+  const handleRegenerateScene = async (sceneNumber: number) => {
+    if (!activeIdea || regeneratingScenes.includes(sceneNumber)) {
+      return;
+    }
+
+    try {
+      setRegeneratingScenes((prev) => [...prev, sceneNumber]);
+      const normalizedScript = (activeIdea.script || [])
+        .map((scene: Scene, idx: number) => ({
+          scene: scene.scene ?? scene.number ?? idx + 1,
+          text: scene.text ?? scene.description ?? '',
+          visual: scene.visual || '',
+        }))
+        .filter((scene: { scene: number }) => scene.scene >= 1 && scene.scene <= 5);
+
+      const response = await ideaAPI.regenerateScene({
+        idea: {
+          format: (activeIdea.format || '').toUpperCase() as 'REEL' | 'CAROUSEL' | 'STORY',
+          hook: activeIdea.hook,
+          script: normalizedScript,
+          cta: activeIdea.cta,
+          dmKeyword: activeIdea.dmKeyword || '',
+        },
+        targetScene: sceneNumber,
+      });
+
+      const regeneratedScene = response.data?.scene;
+      if (!regeneratedScene?.text) {
+        return;
+      }
+
+      setEditableIdeas((prev) => {
+        if (!prev) return prev;
+        const current = prev[activeTab];
+        const nextScript = [...(current.script || [])];
+        const existingIndex = nextScript.findIndex(
+          (scene, idx) => (scene.scene ?? scene.number ?? idx + 1) === sceneNumber
+        );
+
+        const nextScene = {
+          scene: sceneNumber,
+          text: regeneratedScene.text,
+          visual: regeneratedScene.visual || '',
+        };
+
+        if (existingIndex >= 0) {
+          nextScript[existingIndex] = nextScene;
+        } else {
+          nextScript.push(nextScene);
+        }
+
+        nextScript.sort((a, b) => (a.scene ?? a.number ?? 99) - (b.scene ?? b.number ?? 99));
+
+        return {
+          ...prev,
+          [activeTab]: {
+            ...current,
+            script: nextScript,
+          },
+        };
+      });
+    } finally {
+      setRegeneratingScenes((prev) => prev.filter((value) => value !== sceneNumber));
+    }
   };
 
   const hasNiche = !!userData?.niche;
@@ -87,6 +175,12 @@ export default function DailyIdea() {
 
     return () => window.clearTimeout(timer);
   }, [hasGeneratedIdea, isProcessing, activeTab]);
+
+  useEffect(() => {
+    if (generateMutation.data?.data) {
+      setEditableIdeas(generateMutation.data.data as MultiIdeas);
+    }
+  }, [generateMutation.data]);
 
   useEffect(() => {
     if (!generateMutation.isSuccess || !generateMutation.data?.data || hasNiche || generationMode !== 'general') {
@@ -350,12 +444,16 @@ export default function DailyIdea() {
             {/* Display Active Format Idea Card */}
             {activeIdea && (
               <div className="max-w-3xl mx-auto">
-                <IdeaCard idea={activeIdea} />
+                <IdeaCard
+                  idea={activeIdea}
+                  onRegenerateScene={handleRegenerateScene}
+                  regeneratingScenes={regeneratingScenes}
+                />
               </div>
             )}
 
             {/* Actions */}
-            <div className="sticky bottom-4 z-20 mx-auto mt-8 flex max-w-3xl justify-center">
+            <div className="mx-auto mt-8 flex max-w-3xl justify-center md:sticky md:bottom-4 md:z-20">
               <div className="flex flex-wrap justify-center gap-4 rounded-[24px] border border-white/10 bg-[rgba(5,10,20,0.88)] px-4 py-4 backdrop-blur-xl">
                 <Button
                   onClick={() => handleGenerate(generationMode)}
