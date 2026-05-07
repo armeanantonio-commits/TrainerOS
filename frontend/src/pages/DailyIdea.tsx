@@ -61,6 +61,7 @@ export default function DailyIdea() {
   const [activeTab, setActiveTab] = useState<'reel' | 'carousel' | 'story'>('reel');
   const [editableIdeas, setEditableIdeas] = useState<MultiIdeas | null>(null);
   const [regeneratingScenes, setRegeneratingScenes] = useState<number[]>([]);
+  const [isRegeneratingHook, setIsRegeneratingHook] = useState(false);
   const generatedIdeas = editableIdeas || generateMutation.data?.data;
   const hasCompleteIdeaSet =
     !!generatedIdeas?.reel && !!generatedIdeas?.carousel && !!generatedIdeas?.story;
@@ -149,6 +150,52 @@ export default function DailyIdea() {
       });
     } finally {
       setRegeneratingScenes((prev) => prev.filter((value) => value !== sceneNumber));
+    }
+  };
+
+  const handleRegenerateHook = async () => {
+    if (!activeIdea || isRegeneratingHook) {
+      return;
+    }
+
+    try {
+      setIsRegeneratingHook(true);
+      const normalizedScript = (activeIdea.script || [])
+        .map((scene: Scene, idx: number) => ({
+          scene: scene.scene ?? scene.number ?? idx + 1,
+          text: scene.text ?? scene.description ?? '',
+          visual: scene.visual || '',
+        }))
+        .filter((scene: { scene: number }) => scene.scene >= 1 && scene.scene <= 5);
+
+      const response = await ideaAPI.regenerateHook({
+        idea: {
+          format: (activeIdea.format || '').toUpperCase() as 'REEL' | 'CAROUSEL' | 'STORY',
+          hook: activeIdea.hook,
+          script: normalizedScript,
+          cta: activeIdea.cta,
+          dmKeyword: activeIdea.dmKeyword || '',
+        },
+      });
+
+      const regeneratedHook = response.data?.hook;
+      if (!regeneratedHook) {
+        return;
+      }
+
+      setEditableIdeas((prev) => {
+        if (!prev) return prev;
+        const current = prev[activeTab];
+        return {
+          ...prev,
+          [activeTab]: {
+            ...current,
+            hook: regeneratedHook,
+          },
+        };
+      });
+    } finally {
+      setIsRegeneratingHook(false);
     }
   };
 
@@ -444,11 +491,13 @@ export default function DailyIdea() {
             {/* Display Active Format Idea Card */}
             {activeIdea && (
               <div className="max-w-3xl mx-auto">
-                <IdeaCard
-                  idea={activeIdea}
-                  onRegenerateScene={handleRegenerateScene}
-                  regeneratingScenes={regeneratingScenes}
-                />
+              <IdeaCard
+                idea={activeIdea}
+                onRegenerateHook={handleRegenerateHook}
+                isRegeneratingHook={isRegeneratingHook}
+                onRegenerateScene={handleRegenerateScene}
+                regeneratingScenes={regeneratingScenes}
+              />
               </div>
             )}
 

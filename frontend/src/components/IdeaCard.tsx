@@ -27,10 +27,18 @@ interface IdeaCardProps {
     conversionRate?: string;
   };
   onRegenerateScene?: (sceneNumber: number) => void;
+  onRegenerateHook?: () => void;
+  isRegeneratingHook?: boolean;
   regeneratingScenes?: number[];
 }
 
-export default function IdeaCard({ idea, onRegenerateScene, regeneratingScenes = [] }: IdeaCardProps) {
+export default function IdeaCard({
+  idea,
+  onRegenerateScene,
+  onRegenerateHook,
+  isRegeneratingHook = false,
+  regeneratingScenes = [],
+}: IdeaCardProps) {
   const { t, language } = useI18n();
   const [copied, setCopied] = useState<string | null>(null);
   const format = (idea.format || 'REEL').toLowerCase();
@@ -80,7 +88,21 @@ export default function IdeaCard({ idea, onRegenerateScene, regeneratingScenes =
           {/* Hook */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-console-accent font-bold text-lg">HOOK</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-console-accent font-bold text-lg">HOOK</h3>
+                {onRegenerateHook && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onRegenerateHook}
+                    isLoading={isRegeneratingHook}
+                    aria-label="Regenerate hook"
+                    title={language === 'en' ? 'Regenerate hook' : 'Regenerează hook-ul'}
+                  >
+                    ↻
+                  </Button>
+                )}
+              </div>
               <Button
                 variant="outline"
                 size="sm"

@@ -1580,6 +1580,17 @@ export interface RegenerateSceneInput {
   language?: SupportedLanguage;
 }
 
+export interface RegenerateHookInput {
+  niche: string;
+  format: 'REEL' | 'CAROUSEL' | 'STORY';
+  hook: string;
+  cta: string;
+  dmKeyword: string;
+  script: Scene[];
+  contentPreferences?: any;
+  language?: SupportedLanguage;
+}
+
 export interface StructuredIdeaSection {
   sectionTitle: string;
   text: string;
@@ -3170,7 +3181,13 @@ function buildEmergencyLeadMagnet(audienceLabel: string): string {
 }
 
 function buildEmergencyHook(angle: string): string {
-  return angle.slice(0, 120).trim();
+  const cleaned = normalizeTextValue(angle).replace(/\s+/g, ' ').trim();
+  if (!cleaned) {
+    return 'Schimbă un singur lucru azi și corpul tău îți va mulțumi.';
+  }
+  const repaired = repairPossiblyTruncatedText(cleaned, cleaned);
+  const withEnding = /[.!?]$/.test(repaired) ? repaired : `${repaired}.`;
+  return withEnding;
 }
 
 function buildEmergencyScenes(lines: string[], visualPrefix: string): Scene[] {
@@ -5046,6 +5063,102 @@ ${isEn ? 'Return only valid JSON:' : 'Returnează doar JSON valid:'}
     text: normalizeTextValue(text),
     visual: !isWeakSceneVisual(visual) ? normalizeTextValue(visual) : fallbackVisual,
   };
+}
+
+export async function regenerateDailyIdeaHook(input: RegenerateHookInput): Promise<string> {
+  const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
+  const language = normalizeLanguage(input.language);
+  const isEn = language === 'en';
+  const brandVoiceSection = buildBrandVoiceSection(input.contentPreferences);
+  const normalizedScenes = Array.from({ length: 5 }, (_, index) => {
+    const sceneNumber = index + 1;
+    const existing = input.script.find((scene) => scene.scene === sceneNumber) || input.script[index];
+    return `${isEn ? 'SCENE' : 'SCENA'} ${sceneNumber}: ${normalizeTextValue(existing?.text) || (isEn ? '[MISSING]' : '[LIPSA]')}`;
+  }).join('\n');
+
+  const prompt = `${isEn ? 'Generate a new hook line for an existing Daily Idea.' : 'Generezi un hook nou pentru un Daily Idea existent, în limba română.'}
+
+${languageInstruction}
+
+${isEn ? 'CONTEXT' : 'CONTEXT'}:
+- ${isEn ? 'Niche' : 'Nișă'}: "${input.niche}"
+- Format: ${input.format}
+- ${isEn ? 'Current hook (must be changed)' : 'Hook curent (trebuie schimbat)'}: ${input.hook}
+- CTA: ${input.cta}
+- ${isEn ? 'DM keyword' : 'DM keyword'}: ${input.dmKeyword}
+
+BRAND VOICE:
+${brandVoiceSection}
+
+${isEn ? 'SCRIPT CONTEXT' : 'CONTEXT SCRIPT'}:
+${normalizedScenes}
+
+${isEn ? 'TASK' : 'TASK'}:
+- ${isEn ? 'Rewrite ONLY the hook line as one strong sentence.' : 'Rescrie DOAR hook-ul ca o singură propoziție puternică.'}
+- ${isEn ? 'Hook must be clearly different from the current hook.' : 'Hook-ul trebuie să fie clar diferit de hook-ul curent.'}
+- ${isEn ? 'Keep it specific, punchy, and coherent with the script context.' : 'Păstrează-l specific, memorabil și coerent cu scriptul.'}
+- ${isEn ? 'No CTA in hook. No hashtags. No quotes. One line only.' : 'Fără CTA în hook. Fără hashtaguri. Fără ghilimele. Un singur rând.'}
+- ${isEn ? 'Keep it concise (roughly 8-18 words), but always complete.' : 'Păstrează-l concis (aprox. 8-18 cuvinte), dar mereu complet.'}
+
+${isEn ? 'Return ONLY valid JSON, no markdown:' : 'Răspunde DOAR JSON valid, fără markdown:'}
+{
+  "hook": "${isEn ? 'new hook line' : 'hook nou'}"
+}`;
+
+  const fallbackHook = buildEmergencyHook(
+    input.hook || (isEn ? 'Change this hook now so it sounds complete and specific' : 'Schimbă acest hook acum, complet și specific')
+  );
+  const isWeakHook = (value: string): boolean => {
+    const normalized = normalizeTextValue(value);
+    if (!normalized) {
+      return true;
+    }
+    const words = normalized.split(/\s+/).filter(Boolean).length;
+    const hasSentenceEnding = /[.!?]$/.test(normalized);
+    return words < 6 || looksAbruptlyCut(normalized) || !hasSentenceEnding;
+  };
+  const sanitizeHook = (value: string): string => {
+    const compact = normalizeTextValue(value).replace(/\s+/g, ' ').trim();
+    if (!compact) {
+      return '';
+    }
+    const repaired = repairPossiblyTruncatedText(compact, compact);
+    return /[.!?]$/.test(repaired) ? repaired : `${repaired}.`;
+  };
+
+  try {
+    const content = await generateGeminiText(prompt, 0.75, 500);
+    const parsed = await parseModelJson<{ hook?: string }>(content);
+    const candidate = stripModelReasoningLeakage(normalizeTextValue(parsed.hook));
+    const sanitizedCandidate = sanitizeHook(candidate);
+    if (!sanitizedCandidate) {
+      return fallbackHook;
+    }
+
+    if (!isWeakHook(sanitizedCandidate)) {
+      return sanitizedCandidate;
+    }
+
+    const strictRetryPrompt = `${prompt}
+
+${isEn ? 'IMPORTANT:' : 'IMPORTANT:'}
+- ${isEn ? 'The hook must be a COMPLETE sentence that ends with . ! or ?' : 'Hook-ul trebuie să fie o propoziție COMPLETĂ care se termină cu . ! sau ?'}
+- ${isEn ? 'Do not stop mid-thought.' : 'Nu te opri la jumătatea ideii.'}
+- ${isEn ? 'Minimum 7 words.' : 'Minimum 7 cuvinte.'}
+- ${isEn ? 'Return only valid JSON.' : 'Returnează doar JSON valid.'}`;
+
+    const retryContent = await generateGeminiJson(strictRetryPrompt, 0.55, 700);
+    const retryParsed = await parseModelJson<{ hook?: string }>(retryContent);
+    const retryHook = sanitizeHook(stripModelReasoningLeakage(normalizeTextValue(retryParsed.hook)));
+
+    if (!retryHook || isWeakHook(retryHook)) {
+      return fallbackHook;
+    }
+
+    return retryHook;
+  } catch {
+    return fallbackHook;
+  }
 }
 
 export async function structureUserIdea(input: StructureUserIdeaInput): Promise<StructuredIdeaResult> {

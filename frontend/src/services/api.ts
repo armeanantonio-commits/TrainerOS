@@ -188,6 +188,15 @@ export const ideaAPI = {
     };
     targetScene: number;
   }) => api.post('/idea/regenerate-scene', data),
+  regenerateHook: (data: {
+    idea: {
+      format: 'REEL' | 'CAROUSEL' | 'STORY';
+      hook: string;
+      script: Array<{ scene: number; text?: string; visual?: string }>;
+      cta: string;
+      dmKeyword?: string;
+    };
+  }) => api.post('/idea/regenerate-hook', data),
   structure: (data: { ideaText: string }) => api.post('/idea/structure', data),
   history: () => api.get('/idea/history'),
   translate: (data: {

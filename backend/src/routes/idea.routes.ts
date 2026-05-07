@@ -24,6 +24,12 @@ router.post(
   requirePlan('FREE_TRIAL', 'STARTER', 'PRO', 'ELITE', 'MAX'),
   ideaController.regenerateScene
 );
+router.post(
+  '/regenerate-hook',
+  authenticate,
+  requirePlan('FREE_TRIAL', 'STARTER', 'PRO', 'ELITE', 'MAX'),
+  ideaController.regenerateHook
+);
 
 router.post(
   '/structure',
