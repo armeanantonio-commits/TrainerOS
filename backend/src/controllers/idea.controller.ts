@@ -637,7 +637,10 @@ export async function regenerateHook(req: Request, res: Response): Promise<void>
     const user = req.user;
     const language = normalizeLanguage(user.preferredLanguage);
     const data = regenerateHookSchema.parse(req.body ?? {});
-    const ideaNiche = user.niche || 'fitness general pentru adulți din România care vor rezultate sustenabile';
+    const useGeneralIdea = !user.niche;
+    const ideaNiche = useGeneralIdea
+      ? 'fitness general pentru adulți din România care vor rezultate sustenabile'
+      : user.niche!;
     const generationKey = acquireGenerationLock(user.id, 'daily-idea');
 
     if (!generationKey) {
@@ -646,20 +649,42 @@ export async function regenerateHook(req: Request, res: Response): Promise<void>
     }
 
     try {
-      const regeneratedHook = await openaiService.regenerateDailyIdeaHook({
+      const recentIdeas = await prisma.idea.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+        take: RECENT_IDEA_CONTEXT_LIMIT,
+        select: {
+          format: true,
+          hook: true,
+          cta: true,
+          createdAt: true,
+        },
+      });
+      const recentIdeaContext = recentIdeas.map((idea) => ({
+        format: idea.format || 'UNKNOWN',
+        hook: idea.hook || '',
+        cta: idea.cta || '',
+        createdAt: idea.createdAt.toISOString(),
+      }));
+
+      // Use the same robust generator as initial Daily Idea generation.
+      const generated = await openaiService.generateMultiFormatIdea({
         niche: ideaNiche,
-        format: data.idea.format,
-        hook: data.idea.hook,
-        cta: data.idea.cta,
-        dmKeyword: data.idea.dmKeyword || '',
-        script: data.idea.script.map((scene) => ({
-          scene: scene.scene,
-          text: scene.text || '',
-          visual: scene.visual || '',
-        })),
+        icpProfile: useGeneralIdea ? undefined : user.icpProfile,
         contentPreferences: user.contentPreferences,
+        objective: 'lead-gen',
+        recentIdeas: recentIdeaContext,
+        general: useGeneralIdea,
         language,
       });
+
+      const formatKey =
+        data.idea.format === 'REEL'
+          ? 'reel'
+          : data.idea.format === 'CAROUSEL'
+            ? 'carousel'
+            : 'story';
+      const regeneratedHook = generated[formatKey]?.hook || data.idea.hook;
 
       res.json({ hook: regeneratedHook });
     } finally {

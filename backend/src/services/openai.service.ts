@@ -5105,9 +5105,52 @@ ${isEn ? 'Return ONLY valid JSON, no markdown:' : 'Răspunde DOAR JSON valid, f�
   "hook": "${isEn ? 'new hook line' : 'hook nou'}"
 }`;
 
-  const fallbackHook = buildEmergencyHook(
-    input.hook || (isEn ? 'Change this hook now so it sounds complete and specific' : 'Schimbă acest hook acum, complet și specific')
-  );
+  const fallbackHook = isEn
+    ? 'Your schedule is chaotic, but you can still get results with a simple plan.'
+    : 'Programul tău e haotic, dar poți avea rezultate cu un plan simplu.';
+  const endsWithRomanianDanglingConnector = (value: string): boolean => {
+    const normalized = normalizeLooseComparisonText(value).replace(/[.!?]+$/g, '').trim();
+    if (!normalized) {
+      return false;
+    }
+
+    const danglingPatterns = [
+      /\b(sa|să)$/i,
+      /\bca$/i,
+      /\bca sa$/i,
+      /\bca să$/i,
+      /\bpentru$/i,
+      /\bpentru ca$/i,
+      /\bpentru că$/i,
+      /\bdar$/i,
+      /\bsi$/i,
+      /\bși$/i,
+      /\bcu$/i,
+      /\bdupa$/i,
+      /\bdupă$/i,
+      /\bfara$/i,
+      /\bfără$/i,
+      /\bla$/i,
+      /\bin$/i,
+      /\bîn$/i,
+      /\bde$/i,
+      /\bdin$/i,
+      /\bprin$/i,
+      /\bspre$/i,
+      /\bintre$/i,
+      /\bîntre$/i,
+      /\bdespre$/i,
+      /\bpe$/i,
+      /\bun$/i,
+      /\bo$/i,
+      /\bal$/i,
+      /\ba$/i,
+      /\bsau$/i,
+      /\bori$/i,
+    ];
+
+    return danglingPatterns.some((pattern) => pattern.test(normalized));
+  };
   const isWeakHook = (value: string): boolean => {
     const normalized = normalizeTextValue(value);
     if (!normalized) {
@@ -5115,7 +5158,12 @@ ${isEn ? 'Return ONLY valid JSON, no markdown:' : 'Răspunde DOAR JSON valid, f�
     }
     const words = normalized.split(/\s+/).filter(Boolean).length;
     const hasSentenceEnding = /[.!?]$/.test(normalized);
-    return words < 6 || looksAbruptlyCut(normalized) || !hasSentenceEnding;
+    return (
+      words < 6 ||
+      looksAbruptlyCut(normalized) ||
+      !hasSentenceEnding ||
+      (!isEn && endsWithRomanianDanglingConnector(normalized))
+    );
   };
   const sanitizeHook = (value: string): string => {
     const compact = normalizeTextValue(value).replace(/\s+/g, ' ').trim();
@@ -5127,37 +5175,39 @@ ${isEn ? 'Return ONLY valid JSON, no markdown:' : 'Răspunde DOAR JSON valid, f�
   };
 
   try {
-    const content = await generateGeminiText(prompt, 0.75, 500);
-    const parsed = await parseModelJson<{ hook?: string }>(content);
-    const candidate = stripModelReasoningLeakage(normalizeTextValue(parsed.hook));
-    const sanitizedCandidate = sanitizeHook(candidate);
-    if (!sanitizedCandidate) {
-      return fallbackHook;
-    }
-
-    if (!isWeakHook(sanitizedCandidate)) {
-      return sanitizedCandidate;
-    }
-
     const strictRetryPrompt = `${prompt}
 
 ${isEn ? 'IMPORTANT:' : 'IMPORTANT:'}
 - ${isEn ? 'The hook must be a COMPLETE sentence that ends with . ! or ?' : 'Hook-ul trebuie să fie o propoziție COMPLETĂ care se termină cu . ! sau ?'}
 - ${isEn ? 'Do not stop mid-thought.' : 'Nu te opri la jumătatea ideii.'}
 - ${isEn ? 'Minimum 7 words.' : 'Minimum 7 cuvinte.'}
+- ${isEn ? 'Do not end with connectors/prepositions like "to", "for", "and".' : 'NU termina propoziția cu conectori/prepoziții de tip: "să", "ca să", "pentru că", "și", "cu", "de", "în".'}
 - ${isEn ? 'Return only valid JSON.' : 'Returnează doar JSON valid.'}`;
 
-    const retryContent = await generateGeminiJson(strictRetryPrompt, 0.55, 700);
-    const retryParsed = await parseModelJson<{ hook?: string }>(retryContent);
-    const retryHook = sanitizeHook(stripModelReasoningLeakage(normalizeTextValue(retryParsed.hook)));
+    const attempts: Array<{ type: 'normal' | 'strict'; temperature: number; maxTokens: number }> = [
+      { type: 'normal', temperature: 0.75, maxTokens: 500 },
+      { type: 'strict', temperature: 0.55, maxTokens: 700 },
+      { type: 'strict', temperature: 0.45, maxTokens: 800 },
+    ];
 
-    if (!retryHook || isWeakHook(retryHook)) {
-      return fallbackHook;
+    for (const attempt of attempts) {
+      const content =
+        attempt.type === 'normal'
+          ? await generateGeminiText(prompt, attempt.temperature, attempt.maxTokens)
+          : await generateGeminiJson(strictRetryPrompt, attempt.temperature, attempt.maxTokens);
+
+      const parsed = await parseModelJson<{ hook?: string }>(content);
+      const candidate = stripModelReasoningLeakage(normalizeTextValue(parsed.hook));
+      const sanitized = sanitizeHook(candidate);
+
+      if (sanitized && !isWeakHook(sanitized)) {
+        return sanitized;
+      }
     }
 
-    return retryHook;
+    return isWeakHook(fallbackHook) ? buildEmergencyHook('Alege un pas simplu azi și ține-te de el 7 zile.') : fallbackHook;
   } catch {
-    return fallbackHook;
+    return isWeakHook(fallbackHook) ? buildEmergencyHook('Alege un pas simplu azi și ține-te de el 7 zile.') : fallbackHook;
   }
 }
 
