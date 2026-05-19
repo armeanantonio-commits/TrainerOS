@@ -27,6 +27,9 @@ interface IdeaCardProps {
     conversionRate?: string;
   };
   onRegenerateScene?: (sceneNumber: number) => void;
+  onGenerateStoryImage?: (sceneNumber: number, sceneText: string, visualPrompt?: string) => void;
+  generatingStoryImages?: number[];
+  storySceneImages?: Record<number, string>;
   onRegenerateHook?: () => void;
   isRegeneratingHook?: boolean;
   regeneratingScenes?: number[];
@@ -35,12 +38,16 @@ interface IdeaCardProps {
 export default function IdeaCard({
   idea,
   onRegenerateScene,
+  onGenerateStoryImage,
+  generatingStoryImages = [],
+  storySceneImages = {},
   onRegenerateHook,
   isRegeneratingHook = false,
   regeneratingScenes = [],
 }: IdeaCardProps) {
   const { t, language } = useI18n();
   const [copied, setCopied] = useState<string | null>(null);
+  const [expandedPrompts, setExpandedPrompts] = useState<Record<number, boolean>>({});
   const format = (idea.format || 'REEL').toLowerCase();
   const normalizeSceneText = (value?: string) =>
     (value || '')
@@ -64,6 +71,60 @@ export default function IdeaCard({
     await copyToClipboard(text);
     setCopied(type);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleDownloadImage = (imageUrl: string, sceneNumber: number) => {
+    if (!imageUrl) {
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = `story-scene-${sceneNumber}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const copyIconLabel = language === 'en' ? 'Copy' : 'Copiază';
+
+  const getPromptPreview = (value: string, max = 140) => {
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (normalized.length <= max) {
+      return normalized;
+    }
+    return `${normalized.slice(0, max).trimEnd()}...`;
+  };
+
+  const formatStoryPrompt = (value: string) => {
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const sceneMarker = ' Scenă: ';
+    const focusMarker = ' Focus vizual: ';
+    const rulesMarker = ' Un personaj principal,';
+
+    const sceneIndex = normalized.indexOf(sceneMarker);
+    const focusIndex = normalized.indexOf(focusMarker);
+    const rulesIndex = normalized.indexOf(rulesMarker);
+
+    if (sceneIndex === -1 || focusIndex === -1 || rulesIndex === -1) {
+      return {
+        intro: normalized,
+        scene: '',
+        focus: '',
+        rules: '',
+      };
+    }
+
+    return {
+      intro: normalized.slice(0, sceneIndex).trim(),
+      scene: normalized.slice(sceneIndex + sceneMarker.length, focusIndex).trim(),
+      focus: normalized.slice(focusIndex + focusMarker.length, rulesIndex).trim(),
+      rules: normalized.slice(rulesIndex + 1).trim(),
+    };
   };
 
   return (
@@ -131,9 +192,20 @@ export default function IdeaCard({
                     className="console-option p-4"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-console-accent font-bold text-sm">
-                        {t('ideaDetail.sceneLabel', { number: sceneNumber })}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-console-accent font-bold text-sm">
+                          {t('ideaDetail.sceneLabel', { number: sceneNumber })}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(sceneText, `scene-title-${sceneNumber}`)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-700/80 bg-slate-900/70 text-lg text-slate-200 transition hover:border-slate-500 hover:text-white"
+                          title={copyIconLabel}
+                          aria-label={copyIconLabel}
+                        >
+                          {copied === `scene-title-${sceneNumber}` ? '✓' : '⧉'}
+                        </button>
+                      </div>
                       {onRegenerateScene && (
                         <Button
                           variant="outline"
@@ -146,10 +218,105 @@ export default function IdeaCard({
                       )}
                     </div>
                     {sceneText && <p className="mt-1 text-slate-200">{sceneText}</p>}
+                    {format === 'story' && storySceneImages[sceneNumber] && (
+                      <div className="relative mt-3 overflow-hidden rounded-lg border border-slate-700 bg-slate-900/40">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadImage(storySceneImages[sceneNumber], sceneNumber)}
+                          className="absolute right-2 top-2 z-10 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-600/90 bg-black/70 text-2xl text-white shadow-lg transition hover:bg-black/85"
+                          title={language === 'en' ? 'Download image' : 'Descarcă imagine'}
+                          aria-label={language === 'en' ? 'Download image' : 'Descarcă imagine'}
+                        >
+                          ↓
+                        </button>
+                        <img
+                          src={storySceneImages[sceneNumber]}
+                          alt={`Story scene ${sceneNumber}`}
+                          className="h-auto w-full object-cover"
+                        />
+                      </div>
+                    )}
                     {sceneVisual && (
-                      <p className="mt-2 text-xs text-slate-400">
-                        🎬 Vizual: {sceneVisual}
-                      </p>
+                      <div className="mt-2 rounded-md border border-slate-700/70 bg-slate-900/40 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                            {format === 'story' ? 'Prompt imagine' : 'Vizual'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(sceneVisual, `scene-prompt-${sceneNumber}`)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-700/80 bg-slate-900/70 text-lg text-slate-200 transition hover:border-slate-500 hover:text-white"
+                            title={copyIconLabel}
+                            aria-label={copyIconLabel}
+                          >
+                            {copied === `scene-prompt-${sceneNumber}` ? '✓' : '⧉'}
+                          </button>
+                        </div>
+                        {format === 'story' && expandedPrompts[sceneNumber] ? (
+                          (() => {
+                            const parts = formatStoryPrompt(sceneVisual);
+                            if (!parts) {
+                              return null;
+                            }
+                            return (
+                              <div className="mt-1 space-y-2 text-xs text-slate-300">
+                                {parts.intro && (
+                                  <p>
+                                    <span className="font-semibold text-slate-200">Tip:</span> {parts.intro}
+                                  </p>
+                                )}
+                                {parts.scene && (
+                                  <p>
+                                    <span className="font-semibold text-slate-200">Scenă:</span> {parts.scene}
+                                  </p>
+                                )}
+                                {parts.focus && (
+                                  <p>
+                                    <span className="font-semibold text-slate-200">Focus vizual:</span> {parts.focus}
+                                  </p>
+                                )}
+                                {parts.rules && (
+                                  <p>
+                                    <span className="font-semibold text-slate-200">Reguli:</span> {parts.rules}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <p className="mt-1 text-xs text-slate-300">
+                            {format === 'story' ? getPromptPreview(sceneVisual) : sceneVisual}
+                          </p>
+                        )}
+                        {format === 'story' && sceneVisual.length > 140 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedPrompts((prev) => ({
+                                ...prev,
+                                [sceneNumber]: !prev[sceneNumber],
+                              }))
+                            }
+                            className="mt-2 text-xs text-cyan-300 hover:text-cyan-200"
+                          >
+                            {expandedPrompts[sceneNumber]
+                              ? (language === 'en' ? 'Show less' : 'Arată mai puțin')
+                              : (language === 'en' ? 'Show full prompt' : 'Arată prompt complet')}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {format === 'story' && onGenerateStoryImage && (
+                      <div className="mt-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onGenerateStoryImage(sceneNumber, sceneText, sceneVisual)}
+                          isLoading={generatingStoryImages.includes(sceneNumber)}
+                        >
+                          {language === 'en' ? 'Generate image' : 'Generează imagine'}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 );

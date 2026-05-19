@@ -10,7 +10,8 @@ import {
 } from '../lib/generation-lock.js';
 import {
   buildAntiRepeatPromptSection,
-  generateUniqueResult,
+  getRecentGenerationPreviews,
+  rememberGeneratedValue,
 } from '../lib/generation-history.js';
 import { buildAiLanguageInstruction, normalizeLanguage } from '../lib/language.js';
 
@@ -21,6 +22,53 @@ type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
 };
+
+const DEFAULT_CHAT_MAX_OUTPUT_TOKENS = 32768;
+
+function getChatMaxOutputTokens(): number {
+  const parsed = Number.parseInt(process.env.CHAT_MAX_OUTPUT_TOKENS || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_CHAT_MAX_OUTPUT_TOKENS;
+}
+
+function normalizeChatResponse(raw: string): string {
+  if (!raw) return '';
+
+  let text = raw.replace(/\r\n/g, '\n').trim();
+
+  // Remove leaked structured labels/sections that are not suitable for chat bubbles.
+  const blockedSectionStarts = [
+    '**`reasoning`**',
+    '`reasoning`',
+    '**reasoning**',
+    'reasoning:',
+    '**`message_template`**',
+    '`message_template`',
+    '**message_template**',
+    'message_template:',
+    '### Scenariul',
+    '### Scenario',
+  ];
+
+  for (const marker of blockedSectionStarts) {
+    const idx = text.toLowerCase().indexOf(marker.toLowerCase());
+    if (idx !== -1) {
+      text = text.slice(0, idx).trimEnd();
+      break;
+    }
+  }
+
+  // Remove markdown fences if they leaked.
+  text = text.replace(/```[\s\S]*?```/g, '').trim();
+
+  // Remove single wrapping quotes often produced around full answer blocks.
+  if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith('“') && text.endsWith('”'))) {
+    text = text.slice(1, -1).trim();
+  }
+
+  // Keep normal paragraph spacing.
+  text = text.replace(/\n{3,}/g, '\n\n').trim();
+  return text;
+}
 
 router.post('/stream', authenticate, async (req, res) => {
   try {
@@ -118,56 +166,81 @@ router.post('/stream', authenticate, async (req, res) => {
       res.flushHeaders();
 
       const abortController = new AbortController();
-      req.on('close', () => abortController.abort());
-
-      const responseText = await generateUniqueResult({
-        userId: req.user.id,
-        section: 'chat',
-        generate: async ({ recentOutputs, duplicateAttempt }) => {
-          const antiRepeatSection = buildAntiRepeatPromptSection({
-            recentOutputs,
-            duplicateAttempt,
-          });
-          const systemInstruction = [
-            'You are TrainerOS, an AI expert in fitness marketing and content strategy.',
-            'Always identify yourself as "TrainerOS" when asked who you are.',
-            'You must only assist with fitness marketing, fitness content strategy, audience positioning, offers, social media content, content execution, and related conversion issues.',
-            'If the user asks about unrelated topics, politely refuse and redirect to fitness marketing/content topics.',
-            'Use the global context provided below in every answer.',
-            'Keep answers actionable, concise, and structured for execution.',
-            languageInstruction,
-            '',
-            globalContext,
-            antiRepeatSection ? `\n${antiRepeatSection}` : '',
-          ]
-            .filter(Boolean)
-            .join('\n');
-
-          let assistantResponse = '';
-
-          await streamGeminiText(
-            [
-              ...safeHistory,
-              { role: 'user', content: trimmedMessage },
-            ],
-            {
-              system: systemInstruction,
-              temperature: 0.6,
-              maxTokens: 2048,
-              signal: abortController.signal,
-              onText: (token) => {
-                if (token) {
-                  assistantResponse += token;
-                }
-              },
-            },
-          );
-
-          return assistantResponse.trim();
-        },
+      req.on('aborted', () => abortController.abort());
+      res.on('close', () => {
+        if (!res.writableEnded) {
+          abortController.abort();
+        }
       });
+      let hasStreamedToClient = false;
 
+      const antiRepeatSection = buildAntiRepeatPromptSection({
+        recentOutputs: getRecentGenerationPreviews(req.user.id, 'chat', 4),
+      });
+      const systemInstruction = [
+        'You are TrainerOS, an AI expert in fitness marketing and content strategy.',
+        'Always identify yourself as "TrainerOS" when asked who you are.',
+        'You must only assist with fitness marketing, fitness content strategy, audience positioning, offers, social media content, content execution, and related conversion issues.',
+        'If the user asks about unrelated topics, politely refuse and redirect to fitness marketing/content topics.',
+        'Use the global context provided below in every answer.',
+        'Keep answers actionable, concise, and structured for execution.',
+        'Reply like a normal direct chat message.',
+        'Do not output labels, schemas, metadata keys, or analysis blocks (examples forbidden: reasoning, message_template, scenario headers, JSON fields).',
+        'Do not use markdown code fences.',
+        languageInstruction,
+        '',
+        globalContext,
+        antiRepeatSection ? `\n${antiRepeatSection}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      let assistantResponse = '';
+      let streamMessages = [
+        ...safeHistory,
+        { role: 'user' as const, content: trimmedMessage },
+      ];
+      const chatMaxOutputTokens = getChatMaxOutputTokens();
+
+      for (let continuationAttempt = 0; continuationAttempt < 3; continuationAttempt += 1) {
+        const streamResult = await streamGeminiText(streamMessages, {
+          system: systemInstruction,
+          temperature: 0.6,
+          maxTokens: chatMaxOutputTokens,
+          signal: abortController.signal,
+          onText: (token) => {
+            if (token) {
+              assistantResponse += token;
+              if (!res.writableEnded) {
+                hasStreamedToClient = true;
+                res.write(token);
+              }
+            }
+          },
+        });
+
+        if (streamResult.finishReason !== 'MAX_TOKENS' || abortController.signal.aborted || res.writableEnded) {
+          break;
+        }
+
+        streamMessages = [
+          ...safeHistory,
+          { role: 'user' as const, content: trimmedMessage },
+          { role: 'assistant' as const, content: assistantResponse },
+          {
+            role: 'user' as const,
+            content:
+              'Continua exact de unde te-ai oprit. Nu relua inceputul, nu adauga introducere si nu explica de ce continui.',
+          },
+        ];
+      }
+
+      const responseText = normalizeChatResponse(assistantResponse);
       if (responseText) {
+        rememberGeneratedValue(req.user.id, 'chat', responseText);
+      }
+
+      if (responseText && !hasStreamedToClient) {
         res.write(responseText);
       }
 

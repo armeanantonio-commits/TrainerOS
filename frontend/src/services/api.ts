@@ -197,6 +197,11 @@ export const ideaAPI = {
       dmKeyword?: string;
     };
   }) => api.post('/idea/regenerate-hook', data),
+  generateStoryImage: (data: {
+    hook: string;
+    sceneText: string;
+    visualPrompt?: string;
+  }) => api.post('/idea/generate-story-image', data),
   structure: (data: { ideaText: string }) => api.post('/idea/structure', data),
   history: () => api.get('/idea/history'),
   translate: (data: {

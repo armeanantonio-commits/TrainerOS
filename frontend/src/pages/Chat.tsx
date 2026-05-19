@@ -149,6 +149,10 @@ export default function Chat() {
           }
         }
       }
+
+      if (!assistantContent.trim()) {
+        updateLastAssistantMessage(t('chat.streamInterrupted'));
+      }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         setError(err.message || t('chat.streamError'));

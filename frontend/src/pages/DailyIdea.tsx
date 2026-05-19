@@ -61,6 +61,8 @@ export default function DailyIdea() {
   const [activeTab, setActiveTab] = useState<'reel' | 'carousel' | 'story'>('reel');
   const [editableIdeas, setEditableIdeas] = useState<MultiIdeas | null>(null);
   const [regeneratingScenes, setRegeneratingScenes] = useState<number[]>([]);
+  const [generatingStoryImages, setGeneratingStoryImages] = useState<number[]>([]);
+  const [storySceneImages, setStorySceneImages] = useState<Record<number, string>>({});
   const [isRegeneratingHook, setIsRegeneratingHook] = useState(false);
   const generatedIdeas = editableIdeas || generateMutation.data?.data;
   const hasCompleteIdeaSet =
@@ -116,6 +118,17 @@ export default function DailyIdea() {
       const regeneratedScene = response.data?.scene;
       if (!regeneratedScene?.text) {
         return;
+      }
+
+      if (activeTab === 'story') {
+        setStorySceneImages((prev) => {
+          if (!(sceneNumber in prev)) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next[sceneNumber];
+          return next;
+        });
       }
 
       setEditableIdeas((prev) => {
@@ -199,6 +212,31 @@ export default function DailyIdea() {
     }
   };
 
+  const handleGenerateStoryImage = async (sceneNumber: number, sceneText: string, visualPrompt?: string) => {
+    if (!activeIdea || activeTab !== 'story' || generatingStoryImages.includes(sceneNumber)) {
+      return;
+    }
+
+    try {
+      setGeneratingStoryImages((prev) => [...prev, sceneNumber]);
+      const response = await ideaAPI.generateStoryImage({
+        hook: activeIdea.hook,
+        sceneText,
+        visualPrompt: visualPrompt || '',
+      });
+      const imageDataUrl = response.data?.imageDataUrl;
+      if (!imageDataUrl) {
+        return;
+      }
+      setStorySceneImages((prev) => ({
+        ...prev,
+        [sceneNumber]: imageDataUrl,
+      }));
+    } finally {
+      setGeneratingStoryImages((prev) => prev.filter((value) => value !== sceneNumber));
+    }
+  };
+
   const hasNiche = !!userData?.niche;
   const hasBrandVoice = !!userData?.contentPreferences?.brandVoice;
 
@@ -226,6 +264,7 @@ export default function DailyIdea() {
   useEffect(() => {
     if (generateMutation.data?.data) {
       setEditableIdeas(generateMutation.data.data as MultiIdeas);
+      setStorySceneImages({});
     }
   }, [generateMutation.data]);
 
@@ -497,6 +536,9 @@ export default function DailyIdea() {
                 isRegeneratingHook={isRegeneratingHook}
                 onRegenerateScene={handleRegenerateScene}
                 regeneratingScenes={regeneratingScenes}
+                onGenerateStoryImage={handleGenerateStoryImage}
+                generatingStoryImages={generatingStoryImages}
+                storySceneImages={storySceneImages}
               />
               </div>
             )}

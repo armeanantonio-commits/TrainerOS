@@ -44,6 +44,11 @@ const regenerateHookSchema = z.object({
     dmKeyword: z.string().optional().default(''),
   }),
 });
+const generateStoryImageSchema = z.object({
+  hook: z.string().min(3),
+  sceneText: z.string().min(5),
+  visualPrompt: z.string().optional().default(''),
+});
 
 const structureIdeaSchema = z.object({
   ideaText: z.string().min(10).max(4000),
@@ -699,6 +704,34 @@ export async function regenerateHook(req: Request, res: Response): Promise<void>
   }
 }
 
+export async function generateStoryImage(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const user = req.user;
+    const data = generateStoryImageSchema.parse(req.body ?? {});
+    const niche = user.niche || 'fitness general pentru adulți din România';
+
+    const imageDataUrl = await openaiService.generateStorySceneImage({
+      niche,
+      hook: data.hook,
+      sceneText: data.sceneText,
+      visualPrompt: data.visualPrompt,
+    });
+
+    res.json({ imageDataUrl });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: error.errors });
+      return;
+    }
+    res.status(500).json({ error: error.message || 'Failed to generate story image' });
+  }
+}
+
 export default {
   generate,
   generateMultiFormat,
@@ -708,4 +741,5 @@ export default {
   translate,
   regenerateScene,
   regenerateHook,
+  generateStoryImage,
 };

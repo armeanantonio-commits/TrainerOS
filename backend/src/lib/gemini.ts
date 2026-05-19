@@ -15,6 +15,11 @@ interface GeminiTextOptions {
   maxTokens?: number;
 }
 
+interface GeminiStreamResult {
+  finishReason?: string;
+  textLength: number;
+}
+
 function getApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) {
@@ -138,7 +143,7 @@ export async function streamGeminiText(
     signal?: AbortSignal;
     onText: (chunk: string) => void;
   }
-): Promise<void> {
+): Promise<GeminiStreamResult> {
   const response = await fetch(buildApiUrl('streamGenerateContent'), {
     method: 'POST',
     headers: {
@@ -158,6 +163,8 @@ export async function streamGeminiText(
 
   const decoder = new TextDecoder();
   let buffer = '';
+  let finishReason: string | undefined;
+  let textLength = 0;
 
   const processEvent = (rawEvent: string): boolean => {
     const trimmed = rawEvent.trim();
@@ -177,8 +184,17 @@ export async function streamGeminiText(
 
     try {
       const payload = JSON.parse(dataText);
+      if (Array.isArray(payload?.candidates)) {
+        const candidateFinishReason = payload.candidates.find(
+          (candidate: any) => typeof candidate?.finishReason === 'string',
+        )?.finishReason;
+        if (candidateFinishReason) {
+          finishReason = candidateFinishReason;
+        }
+      }
       const text = extractText(payload);
       if (text) {
+        textLength += text.length;
         options.onText(text);
       }
       return true;
@@ -212,7 +228,10 @@ export async function streamGeminiText(
   if (buffer.trim()) {
     const parsed = processEvent(buffer.replace(/\n+$/, ''));
     if (!parsed) {
-      throw new Error('Gemini stream ended with an incomplete event payload');
+      // Tolerate truncated trailing payloads to avoid dropping otherwise valid streamed text.
+      return { finishReason, textLength };
     }
   }
+
+  return { finishReason, textLength };
 }

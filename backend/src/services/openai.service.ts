@@ -78,6 +78,65 @@ async function generateGeminiTextFromMessages(
   );
 }
 
+interface StorySceneImageInput {
+  niche: string;
+  hook: string;
+  sceneText: string;
+  visualPrompt?: string;
+}
+
+export async function generateStorySceneImage(input: StorySceneImageInput): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
+  const model = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image';
+  const prompt = `Generează o imagine foto realistă verticală 9:16 pentru un Instagram Story de fitness.
+Nișă: ${input.niche}
+Hook: ${input.hook}
+Scenă: ${input.sceneText}
+Direcție vizuală: ${input.visualPrompt || 'context realist, personaj principal, acțiune clară'}
+Cerințe: fără text pe imagine, fără watermark, lumină naturală, fundal coerent cu scena, expresie autentică.`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          responseModalities: ['TEXT', 'IMAGE'],
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(`Image generation failed (${response.status}): ${message}`);
+  }
+
+  const payload = (await response.json()) as any;
+  const parts = (payload?.candidates || [])
+    .flatMap((candidate: any) => candidate?.content?.parts || []);
+  const inlineDataPart = parts.find((part: any) => part?.inline_data?.data || part?.inlineData?.data);
+  const inlineData = inlineDataPart?.inline_data || inlineDataPart?.inlineData;
+
+  if (!inlineData?.data) {
+    throw new Error('Image model returned no image payload');
+  }
+
+  const mimeType = inlineData.mime_type || inlineData.mimeType || 'image/png';
+  return `data:${mimeType};base64,${inlineData.data}`;
+}
+
 function normalizeModelJson(content: string | null | undefined): string {
   const raw = (content || '{}').trim();
   const withoutCodeFence = raw
@@ -1680,6 +1739,43 @@ function normalizeTextValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function limitSceneTextToMaxSentences(text: string, maxSentences: number): string {
+  const normalized = normalizeTextValue(text);
+  if (!normalized || maxSentences < 1) {
+    return normalized;
+  }
+
+  const sentences = normalized.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [normalized];
+  return sentences
+    .slice(0, maxSentences)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+function enforceSceneSentenceLimit(script: Scene[], maxSentences: number): Scene[] {
+  return script.map((scene) => ({
+    ...scene,
+    text: limitSceneTextToMaxSentences(scene.text, maxSentences),
+  }));
+}
+
+function buildStoryImagePrompt(sceneText: string, visualHint: string): string {
+  const text = normalizeTextValue(sceneText);
+  const hint = normalizeTextValue(visualHint);
+  const context = text || hint || 'situație reală din viața de zi cu zi';
+  const focus = hint ? ` Focus vizual: ${hint}.` : '';
+
+  return `Imagine foto realistă, vertical 9:16, pentru Instagram Story. Scenă: ${context}.${focus} Un personaj principal, acțiune clară, expresie emoțională potrivită contextului, fundal relevant, lumină naturală, stil autentic, fără text pe imagine, fără watermark.`;
+}
+
+function enforceStoryImagePrompts(script: Scene[]): Scene[] {
+  return script.map((scene) => ({
+    ...scene,
+    visual: buildStoryImagePrompt(scene.text, scene.visual),
+  }));
+}
+
 function cleanNicheTextArtifacts(value: string): string {
   const text = normalizeTextValue(value);
   if (!text) {
@@ -2817,18 +2913,22 @@ function buildDelimitedFormatInstructions(targets: MultiFormatIdeaKey[]): string
   return targets
     .map((target) => {
       const format = formatMap[target];
+      const visualInstruction =
+        target === 'story'
+          ? 'prompt imagine realistă, vertical 9:16, specific scenei (personaj + acțiune + context), fără text pe imagine'
+          : 'vizual scurt, filmabil';
       return `===${format}===
 HOOK: hook scurt și specific, pe un singur rând
 SCENE1: text complet, pe un singur rând
-VISUAL1: vizual scurt, filmabil
+VISUAL1: ${visualInstruction}
 SCENE2: text complet, pe un singur rând
-VISUAL2: vizual scurt, filmabil
+VISUAL2: ${visualInstruction}
 SCENE3: text complet, pe un singur rând
-VISUAL3: vizual scurt, filmabil
+VISUAL3: ${visualInstruction}
 SCENE4: concluzie practică / principiu clar, fără CTA, pe un singur rând
-VISUAL4: vizual scurt, filmabil
+VISUAL4: ${visualInstruction}
 SCENE5: soluție concretă cu pași clari, timp/repetări/frecvență, fără CTA, pe un singur rând
-VISUAL5: vizual scurt, filmabil pentru demonstrarea soluției
+VISUAL5: ${target === 'story' ? visualInstruction : 'vizual scurt, filmabil pentru demonstrarea soluției'}
 CTA: CTA cu keyword DM și beneficiu clar, pe un singur rând
 LEAD_MAGNET: lead magnet scurt, pe un singur rând
 DM_KEYWORD: un singur keyword
@@ -3519,6 +3619,9 @@ REGULI:
 - Cele 3 idei trebuie să fie clar diferite între ele.
 - Hook-ul trebuie să fie specific și complet.
 - Fiecare scenă trebuie să fie clară și utilă.
+- La CAROUSEL: fiecare scenă trebuie să aibă exact 1 sau maximum 2 propoziții.
+- La STORY: fiecare scenă trebuie să aibă exact 1 sau maximum 2 propoziții.
+- La STORY, fiecare câmp visual trebuie să fie prompt de imagine realistă, legat direct de scena lui (personaj + acțiune + context), nu generic.
 - CTA-ul trebuie să includă un keyword DM și un beneficiu clar.
 - CTA-ul stă exclusiv în tag-ul CTA, nu în scene.
 - Scenele 2-4 trebuie să includă elemente aplicabile, nu doar teorie.
@@ -4802,13 +4905,16 @@ REGULI:
 - Hook și CTA: pe un singur rând.
 - Fiecare scenă: pe un singur rând.
 - DM keyword: un singur cuvânt sau maxim două cuvinte scurte.
+- CAROUSEL: fiecare scenă trebuie să aibă exact 1 sau maximum 2 propoziții.
+- STORY: fiecare scenă trebuie să aibă exact 1 sau maximum 2 propoziții.
+- STORY: fiecare VISUAL trebuie să fie prompt de imagine realistă, vertical 9:16, specific scenei (personaj + acțiune + context), fără text pe imagine.
 - Dacă refaci doar o parte lipsă, livrezi DOAR secțiunile cerute acum.
 ${retryReason ? `- CONTEXT RETRY: ${retryReason}` : ''}
 
 STRUCTURĂ:
 - REEL: 5 scene, 28-52 cuvinte per scenă, 1 hook, 1 CTA
-- CAROUSEL: 5 scene/slides, 40-68 cuvinte per scenă, 1 hook, 1 CTA
-- STORY: 5 scene, 18-40 cuvinte per scenă, 1 hook, 1 CTA
+- CAROUSEL: 5 scene/slides, 1-2 propoziții per scenă, 1 hook, 1 CTA
+- STORY: 5 scene, 1-2 propoziții per scenă, 1 hook, 1 CTA
 
 Răspunde DOAR în formatul exact de mai jos:
 ${buildDelimitedFormatInstructions(targets)}`;
@@ -4874,6 +4980,9 @@ ${buildDelimitedFormatInstructions(targets)}`;
   }
 
   result.source = result.source || 'ai';
+  result.carousel.script = enforceSceneSentenceLimit(result.carousel.script, 2);
+  result.story.script = enforceSceneSentenceLimit(result.story.script, 2);
+  result.story.script = enforceStoryImagePrompts(result.story.script);
   
   console.log(`📝 Generated 3 formats - REEL: "${result.reel.hook.substring(0, 30)}..." | CAROUSEL: "${result.carousel.hook.substring(0, 30)}..." | STORY: "${result.story.hook.substring(0, 30)}..."`);
   
@@ -4884,6 +4993,7 @@ export async function regenerateDailyIdeaScene(input: RegenerateSceneInput): Pro
   const languageInstruction = buildAiLanguageInstruction(normalizeLanguage(input.language));
   const language = normalizeLanguage(input.language);
   const isEn = language === 'en';
+  const isCarouselOrStory = input.format === 'CAROUSEL' || input.format === 'STORY';
   const brandVoiceSection = buildBrandVoiceSection(input.contentPreferences);
   const safeTargetScene = Math.min(5, Math.max(1, Math.trunc(input.targetScene)));
   const normalizedScenes = Array.from({ length: 5 }, (_, index) => {
@@ -4928,6 +5038,13 @@ ${isEn ? 'TASK' : 'TASK'}:
 - ${isEn ? 'If target scene is 2-4, include practical elements (not only theory) when natural.' : 'Dacă scena țintă este 2-4, include elemente practice (nu doar teorie) când este natural.'}
 - ${isEn ? 'Visual must be short, filmable and specific to the scene.' : 'Vizualul să fie scurt, filmabil și specific scenei.'}
 - ${isEn ? 'Scene text must be complete (not fragmented), natural and coherent.' : 'Textul scenei trebuie să fie complet (nu fragment), natural și fără întreruperi.'}
+- ${isCarouselOrStory
+    ? (isEn
+      ? 'This format requires 1 sentence, maximum 2 sentences for the scene text.'
+      : 'Acest format cere 1 propoziție, maximum 2 propoziții pentru textul scenei.')
+    : (isEn
+      ? 'Keep scene text concise and easy to deliver naturally.'
+      : 'Păstrează textul scenei concis și ușor de livrat natural.')}
 
 ${isEn ? 'Return ONLY valid JSON, no markdown:' : 'Răspunde DOAR JSON valid, fără markdown:'}
 {
@@ -5045,7 +5162,7 @@ ${isEn ? 'Return only valid JSON:' : 'Returnează doar JSON valid:'}
     return {
       scene: safeTargetScene,
       text: fallback.text,
-      visual: fallback.visual,
+      visual: input.format === 'STORY' ? buildStoryImagePrompt(fallback.text, fallback.visual) : fallback.visual,
     };
   }
 
@@ -5060,8 +5177,20 @@ ${isEn ? 'Return only valid JSON:' : 'Returnează doar JSON valid:'}
 
   return {
     scene: safeTargetScene,
-    text: normalizeTextValue(text),
-    visual: !isWeakSceneVisual(visual) ? normalizeTextValue(visual) : fallbackVisual,
+    text: isCarouselOrStory
+      ? limitSceneTextToMaxSentences(normalizeTextValue(text), 2)
+      : normalizeTextValue(text),
+    visual:
+      input.format === 'STORY'
+        ? buildStoryImagePrompt(
+            isCarouselOrStory
+              ? limitSceneTextToMaxSentences(normalizeTextValue(text), 2)
+              : normalizeTextValue(text),
+            !isWeakSceneVisual(visual) ? normalizeTextValue(visual) : fallbackVisual
+          )
+        : !isWeakSceneVisual(visual)
+          ? normalizeTextValue(visual)
+          : fallbackVisual,
   };
 }
 

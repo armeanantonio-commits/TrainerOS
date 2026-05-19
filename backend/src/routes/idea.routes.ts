@@ -30,6 +30,12 @@ router.post(
   requirePlan('FREE_TRIAL', 'STARTER', 'PRO', 'ELITE', 'MAX'),
   ideaController.regenerateHook
 );
+router.post(
+  '/generate-story-image',
+  authenticate,
+  requirePlan('FREE_TRIAL', 'STARTER', 'PRO', 'ELITE', 'MAX'),
+  ideaController.generateStoryImage
+);
 
 router.post(
   '/structure',
