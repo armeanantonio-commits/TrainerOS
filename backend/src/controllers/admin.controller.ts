@@ -379,6 +379,7 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
         id: true,
         email: true,
         name: true,
+        niche: true,
         isEmailVerified: true,
         isAdmin: true,
         plan: true,

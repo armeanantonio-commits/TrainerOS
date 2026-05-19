@@ -86,6 +86,7 @@ export interface AdminUserProfileResponse {
     id: string;
     email: string;
     name: string | null;
+    niche: string | null;
     isEmailVerified: boolean;
     isAdmin: boolean;
     plan: Plan;
