@@ -226,12 +226,14 @@ export default function DailyIdea() {
       });
       const imageDataUrl = response.data?.imageDataUrl;
       if (!imageDataUrl) {
-        return;
+        throw new Error('Image data missing from response');
       }
       setStorySceneImages((prev) => ({
         ...prev,
         [sceneNumber]: imageDataUrl,
       }));
+    } catch (error: any) {
+      window.alert(error?.response?.data?.error || error?.message || 'Nu am putut genera imaginea. Încearcă din nou.');
     } finally {
       setGeneratingStoryImages((prev) => prev.filter((value) => value !== sceneNumber));
     }

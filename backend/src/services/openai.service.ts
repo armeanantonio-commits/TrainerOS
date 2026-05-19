@@ -98,43 +98,44 @@ Hook: ${input.hook}
 Scenă: ${input.sceneText}
 Direcție vizuală: ${input.visualPrompt || 'context realist, personaj principal, acțiune clară'}
 Cerințe: fără text pe imagine, fără watermark, lumină naturală, fundal coerent cu scena, expresie autentică.`;
+  const requestUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const requestBody = {
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: prompt }],
+      },
+    ],
+    generationConfig: {
+      responseModalities: ['TEXT', 'IMAGE'],
+    },
+  };
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const response = await fetch(requestUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          responseModalities: ['TEXT', 'IMAGE'],
-        },
-      }),
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(`Image generation failed (${response.status}): ${message}`);
     }
-  );
 
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(`Image generation failed (${response.status}): ${message}`);
+    const payload = (await response.json()) as any;
+    const parts = (payload?.candidates || [])
+      .flatMap((candidate: any) => candidate?.content?.parts || []);
+    const inlineDataPart = parts.find((part: any) => part?.inline_data?.data || part?.inlineData?.data);
+    const inlineData = inlineDataPart?.inline_data || inlineDataPart?.inlineData;
+
+    if (inlineData?.data) {
+      const mimeType = inlineData.mime_type || inlineData.mimeType || 'image/png';
+      return `data:${mimeType};base64,${inlineData.data}`;
+    }
   }
 
-  const payload = (await response.json()) as any;
-  const parts = (payload?.candidates || [])
-    .flatMap((candidate: any) => candidate?.content?.parts || []);
-  const inlineDataPart = parts.find((part: any) => part?.inline_data?.data || part?.inlineData?.data);
-  const inlineData = inlineDataPart?.inline_data || inlineDataPart?.inlineData;
-
-  if (!inlineData?.data) {
-    throw new Error('Image model returned no image payload');
-  }
-
-  const mimeType = inlineData.mime_type || inlineData.mimeType || 'image/png';
-  return `data:${mimeType};base64,${inlineData.data}`;
+  throw new Error('Image model returned no image payload');
 }
 
 function normalizeModelJson(content: string | null | undefined): string {
