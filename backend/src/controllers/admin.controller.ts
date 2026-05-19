@@ -28,6 +28,10 @@ const userProfileQuerySchema = z.object({
   historyLimit: z.coerce.number().int().min(5).max(100).default(25),
 });
 
+function hasValue(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 const updateUserSchema = z
   .object({
     plan: z.nativeEnum(Plan).optional(),
@@ -421,6 +425,9 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
         id: true,
         email: true,
         name: true,
+        niche: true,
+        icpProfile: true,
+        positioningMessage: true,
         isEmailVerified: true,
         isAdmin: true,
         plan: true,
@@ -568,6 +575,7 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
     res.json({
       user: {
         ...user,
+        hasNicheProfile: hasValue(user.niche) || user.icpProfile != null || hasValue(user.positioningMessage),
         lastPaymentAt,
       },
       usage: {

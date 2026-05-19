@@ -103,7 +103,7 @@ export default function UserProfilePage() {
           <p>Email</p>
           <p>{user.email}</p>
           <p>Niche Completed</p>
-          <p>{user.niche?.trim() ? 'Yes' : 'No'}</p>
+          <p>{user.hasNicheProfile ? 'Yes' : 'No'}</p>
           <p>Plan</p>
           <p>{user.plan}</p>
           <p>Email Verified</p>
