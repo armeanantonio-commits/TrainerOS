@@ -997,16 +997,21 @@ function buildQuickIcpFallbackPositioning(input: NicheQuickICPInput, niche: stri
 
 function seemsIncompleteNiche(value: string): boolean {
   const normalized = normalizeTextField(value);
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
 
   if (!normalized) {
     return true;
   }
 
-  if (!/[.!?]$/.test(normalized)) {
+  if (wordCount < 4) {
     return true;
   }
 
-  return /\b(și|sau|cu|pentru|din|de|la|în|pe|program|joburi?)\.?$/i.test(normalized);
+  if (/[,:;/-]$/.test(normalized)) {
+    return true;
+  }
+
+  return /\b(și|sau|cu|pentru|din|de|la|în|pe|program|joburi?|and|or|with|for|to|of|in)\.?$/i.test(normalized);
 }
 
 function buildDiscoverAudienceSummary(input: NicheDiscoverInput, language: SupportedLanguage): string {
@@ -1761,6 +1766,47 @@ function enforceSceneSentenceLimit(script: Scene[], maxSentences: number): Scene
   }));
 }
 
+function limitTextToMaxWords(text: string, maxWords: number): string {
+  const normalized = normalizeTextValue(text);
+  if (!normalized || maxWords < 1) {
+    return normalized;
+  }
+
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) {
+    return normalized;
+  }
+
+  const limited = words.slice(0, maxWords).join(' ').trim();
+  const completed = trimToLastCompleteSentence(limited);
+  return completed && completed.split(/\s+/).filter(Boolean).length >= Math.max(8, Math.floor(maxWords * 0.55))
+    ? completed
+    : `${limited.replace(/[,:;/-]+$/g, '').trim()}...`;
+}
+
+function compactDailyIdeaResult(result: DailyIdeaResult): DailyIdeaResult {
+  const format = result.format;
+  const sceneSentenceLimit = format === 'REEL' ? 3 : 2;
+  const sceneWordLimit = format === 'REEL' ? 55 : format === 'CAROUSEL' ? 34 : 26;
+  const visualWordLimit = format === 'STORY' ? 48 : 16;
+
+  return {
+    ...result,
+    hook: limitTextToMaxWords(limitSceneTextToMaxSentences(result.hook, 1), 16),
+    cta: limitTextToMaxWords(limitSceneTextToMaxSentences(result.cta, 2), 18),
+    leadMagnet: limitTextToMaxWords(limitSceneTextToMaxSentences(result.leadMagnet, 2), 24),
+    reasoning: limitTextToMaxWords(limitSceneTextToMaxSentences(result.reasoning, 3), 65),
+    script: result.script.map((scene) => ({
+      ...scene,
+      text: limitTextToMaxWords(limitSceneTextToMaxSentences(scene.text, sceneSentenceLimit), sceneWordLimit),
+      visual:
+        format === 'STORY'
+          ? limitTextToMaxWords(scene.visual, visualWordLimit)
+          : limitTextToMaxWords(limitSceneTextToMaxSentences(scene.visual, 1), visualWordLimit),
+    })),
+  };
+}
+
 function buildStoryImagePrompt(sceneText: string, visualHint: string): string {
   const text = normalizeTextValue(sceneText);
   const hint = normalizeTextValue(visualHint);
@@ -2138,7 +2184,7 @@ function normalizeDailyIdeaResult(
     throw new Error(`AI returned incomplete ${expectedFormat} content.`);
   }
 
-  return {
+  return compactDailyIdeaResult({
     format: (['REEL', 'CAROUSEL', 'STORY'].includes(format) ? format : expectedFormat) as DailyIdeaResult['format'],
     hook,
     script,
@@ -2148,7 +2194,7 @@ function normalizeDailyIdeaResult(
     leadMagnet,
     dmKeyword: keyword,
     reasoning,
-  };
+  });
 }
 
 function normalizeMultiFormatIdeaResult(value: unknown): MultiFormatIdeaResult {
@@ -4800,8 +4846,9 @@ REGULĂ LINGVISTICĂ FINALĂ:
 - claritatea și logica sunt obligatorii, nu opționale
 
 IMPORTANT PENTRU SCRIPT - CERINȚE DETALIATE:
-- Pentru fiecare scenă/slide, câmpul "text" trebuie să fie FOARTE DETALIAT și COMPLET
-- Minim 4-6 propoziții per scenă (≈ 80-150 de cuvinte), în limba cerută, naturală și conversațională
+- Pentru fiecare scenă/slide, câmpul "text" trebuie să fie clar, specific și ușor de consumat
+- REEL: 2-3 propoziții per scenă (≈ 28-55 cuvinte)
+- CAROUSEL și STORY: 1-2 propoziții per scenă (≈ 16-34 cuvinte)
 - Nicio scenă nu are voie să conțină formulări de tipul "scrie în DM", "comentează", "salvează", "swipe up", "trimite mesaj" sau alte CTA-uri mascate
 - Include:
   * Tranziții naturale ("Acum să-ți arăt...", "Uite ce se întâmplă...", "De ce funcționează?", "Hai să vorbim despre...")
@@ -4809,9 +4856,8 @@ IMPORTANT PENTRU SCRIPT - CERINȚE DETALIATE:
   * Detalii tehnice relevante (ex: "30 de minute dimineața, înainte de cafea")
   * Storytelling elements (metafore, comparații, micro-story)
   * Pain points și soluții explicite
-- Pentru REEL: 5-7 scene (nu 4-6)
-- Pentru CAROUSEL: 8-10 slide-uri (nu 6-9)
-- Reasoning: 4-5 propoziții DETALIATE cu psihologie și strategie marketing
+- Pentru toate formatele: exact 5 scene/slide-uri
+- Reasoning: 2-3 propoziții clare, fără repetiții și fără teorie inutilă
 
 Răspunde DOAR în format JSON strict, fără markdown.
 IMPORTANT:
@@ -4825,22 +4871,22 @@ FORMAT:
   "format": "REEL",
   "hook": "Hook vizual scurt, foarte natural și SPECIFIC (ideal 8-14 cuvinte, maxim 16)",
   "script": [
-    {"scene": 1, "text": "Text DETALIAT cu 4-6 propoziții (80-150 cuvinte) - include context, tranziții, exemple specifice, storytelling", "visual": "Cadru/visual concret și descriptiv"},
-    {"scene": 2, "text": "Text DETALIAT cu 4-6 propoziții (80-150 cuvinte) - include detalii tehnice, pain points, soluții clare", "visual": "Cadru/visual concret și descriptiv"},
-    {"scene": 3, "text": "Text DETALIAT cu 4-6 propoziții (80-150 cuvinte)", "visual": "Visual"}
+    {"scene": 1, "text": "Text compact și specific, 2-3 propoziții pentru REEL sau 1-2 pentru CAROUSEL/STORY", "visual": "Cadru/visual concret și descriptiv"},
+    {"scene": 2, "text": "Text compact cu exemplu clar și soluție aplicabilă", "visual": "Cadru/visual concret și descriptiv"},
+    {"scene": 3, "text": "Text compact, natural și complet", "visual": "Visual"}
   ],
   "cta": "CTA direct, scurt și conversațional cu keyword DM + beneficiu simplu și clar",
   "objective": "Generare lead-uri",
   "conversionRate": 45.5,
   "leadMagnet": "Lead magnet FOARTE specific și detaliat pentru nișă (descrie EXACT ce primește)",
   "dmKeyword": "Keyword-ul din DM",
-  "reasoning": "De ce funcționează această idee - 4-5 propoziții DETALIATE, scrise clar și natural în limba cerută, care explică psihologia, pattern-urile de conversie, și de ce rezonează cu ICP-ul specific"
+  "reasoning": "De ce funcționează această idee - 2-3 propoziții clare și utile, fără umplutură"
 }`;
 
   console.log(`🎯 Generating idea for niche: "${input.niche}"`);
   console.log(`👤 ICP: ${icpProfileText.substring(0, 100)}...`);
 
-  const content = await generateGeminiJson(prompt, 0.8, 3500);
+  const content = await generateGeminiJson(prompt, 0.7, 2200);
   console.log(`✅ Gemini response received (${content.length} chars) [model=${GEMINI_MODEL}]`);
   const parsed = await parseModelJson<DailyIdeaResult>(content);
   const result = normalizeDailyIdeaResult(parsed, 'REEL');
